@@ -354,7 +354,7 @@ export default function HomeScreen() {
                 style={styles.viewMoreButton}
                 onPress={() => router.push('/wishbox')}
               >
-                <Text style={styles.viewMoreText}>View {activeWishes.length - 5} more wishes</Text>
+                <Text style={styles.viewMoreText}>View {activeWishes.length - 3} more wishes</Text>
                 <Ionicons name="arrow-forward" size={16} color="#6366F1" />
               </TouchableOpacity>
             )}
