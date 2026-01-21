@@ -206,20 +206,36 @@ export default function HomeScreen() {
 
   // Get greeting based on returning user status
   const userName = user?.name?.split(' ')[0] || 'User';
-  const greeting = isReturningUser ? `Welcome back, ${userName}` : `Welcome, ${userName}`;
+  const greeting = isReturningUser ? `Welcome back` : `Welcome`;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>{greeting}</Text>
-          <TouchableOpacity style={styles.locationRow} onPress={() => router.push('/location-picker')}>
-            <Ionicons name="location" size={14} color="#6366F1" />
-            <Text style={styles.locationText} numberOfLines={1}>{displayLocation}</Text>
-            <Ionicons name="chevron-down" size={14} color="#6366F1" />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity 
+          style={styles.headerLeft}
+          onPress={() => router.push('/account/profile')}
+        >
+          {/* User Avatar */}
+          {user?.picture ? (
+            <Image source={{ uri: user.picture }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Ionicons name="person" size={20} color="#6366F1" />
+            </View>
+          )}
+          <View style={styles.greetingContainer}>
+            <Text style={styles.greeting}>{greeting}, <Text style={styles.userName}>{userName}</Text></Text>
+            <TouchableOpacity style={styles.locationRow} onPress={(e) => {
+              e.stopPropagation();
+              router.push('/location-picker');
+            }}>
+              <Ionicons name="location" size={12} color="#6366F1" />
+              <Text style={styles.locationText} numberOfLines={1}>{displayLocation}</Text>
+              <Ionicons name="chevron-down" size={12} color="#6366F1" />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
         <TouchableOpacity 
           style={styles.wishboxButton}
           onPress={() => router.push('/wishbox')}
