@@ -85,7 +85,7 @@ export default function AccountScreen() {
             <Text style={styles.profileName}>{user?.name || 'User'}</Text>
             <Text style={styles.profileEmail}>{user?.email || 'email@example.com'}</Text>
           </View>
-          <TouchableOpacity style={styles.editButton}>
+          <TouchableOpacity style={styles.editButton} onPress={() => router.push('/account/profile')}>
             <Ionicons name="pencil" size={20} color="#6366F1" />
           </TouchableOpacity>
         </View>
@@ -102,11 +102,7 @@ export default function AccountScreen() {
                     styles.menuItem,
                     itemIndex < section.items.length - 1 && styles.menuItemBorder,
                   ]}
-                  onPress={() => {
-                    if (item.route) {
-                      Alert.alert('Coming Soon', 'This feature is under development');
-                    }
-                  }}
+                  onPress={() => handleMenuPress(item.route, item.label)}
                 >
                   <View style={styles.menuItemIcon}>
                     <Ionicons name={item.icon as any} size={22} color="#6366F1" />
