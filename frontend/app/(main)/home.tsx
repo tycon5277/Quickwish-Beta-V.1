@@ -379,13 +379,19 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginTop: 2,
   },
   locationText: {
     fontSize: 13,
-    color: '#6B7280',
+    color: '#374151',
     marginLeft: 4,
     marginRight: 4,
-    maxWidth: 180,
+    maxWidth: 160,
+    fontWeight: '500',
   },
   wishboxButton: {
     width: 48,
