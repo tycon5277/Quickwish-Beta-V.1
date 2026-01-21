@@ -201,39 +201,48 @@ frontend:
 
   - task: "Home screen with Make a Wish"
     implemented: true
-    working: true
+    working: "NA"
     file: "/app/frontend/app/(main)/home.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Home with user greeting, location, quick actions, active wishes"
+      - working: "NA"
+        agent: "testing"
+        comment: "Cannot test - requires Google OAuth authentication. UI code reviewed: Home screen properly implemented with Make a Wish button, user greeting, location display, quick actions, and active wishes list. Authentication redirect working correctly."
 
   - task: "Create Wish flow (4-step wizard)"
     implemented: true
-    working: true
+    working: "NA"
     file: "/app/frontend/app/wish/create.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Multi-step wizard for wish creation with type, description, location, remuneration"
+      - working: "NA"
+        agent: "testing"
+        comment: "Cannot test - requires authentication. UI code reviewed: 4-step wizard properly implemented with wish type selection, title/description input, location/radius settings, and remuneration/timing options. Progress bar and navigation between steps included."
 
   - task: "Wishbox screen"
     implemented: true
-    working: true
+    working: "NA"
     file: "/app/frontend/app/wishbox.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "View all wishes with filtering"
+      - working: "NA"
+        agent: "testing"
+        comment: "Cannot test - requires authentication. Screen accessible from home via wishbox button but needs valid session token to load wish data."
 
   - task: "Explore screen"
     implemented: true
@@ -249,15 +258,18 @@ frontend:
 
   - task: "Chat list and detail screens"
     implemented: true
-    working: true
+    working: "NA"
     file: "/app/frontend/app/(main)/chat.tsx, /app/frontend/app/chat/[id].tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Polling-based chat with approve deal functionality"
+      - working: "NA"
+        agent: "testing"
+        comment: "Cannot test - requires authentication. Chat functionality needs valid session token to access chat rooms and messages. Backend API tested and working."
 
   - task: "Local Hub marketplace"
     implemented: true
