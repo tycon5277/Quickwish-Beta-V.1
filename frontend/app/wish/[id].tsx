@@ -11,7 +11,7 @@ import { useAppStore } from '../../src/store';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
-                   'https://quickwish-1.preview.emergentagent.com';
+                   'https://quickwish-2.preview.emergentagent.com';
 
 const WISH_TYPES = [
   { id: 'delivery', label: 'Delivery', icon: 'bicycle' },

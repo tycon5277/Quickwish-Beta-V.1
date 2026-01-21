@@ -10,7 +10,7 @@ import Constants from 'expo-constants';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
-                   'https://quickwish-1.preview.emergentagent.com';
+                   'https://quickwish-2.preview.emergentagent.com';
 
 // Auth Context
 interface User {
