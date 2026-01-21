@@ -27,13 +27,21 @@ export default function AccountScreen() {
     );
   };
 
+  const handleMenuPress = (route: string | null, label: string) => {
+    if (route === '/account/profile' || route === '/account/addresses') {
+      router.push(route);
+    } else if (route) {
+      Alert.alert('Coming Soon', `${label} feature is under development`);
+    }
+  };
+
   const menuItems = [
     {
       section: 'Account',
       items: [
         { icon: 'person-outline', label: 'Personal Information', route: '/account/profile' },
-        { icon: 'call-outline', label: 'Verified Phone', value: user?.phone || 'Not set', route: '/account/phone' },
-        { icon: 'location-outline', label: 'My Addresses', route: '/account/addresses' },
+        { icon: 'call-outline', label: 'Verified Phone', value: user?.phone || 'Not set', route: '/account/profile' },
+        { icon: 'location-outline', label: 'My Addresses', value: `${user?.addresses?.length || 0} saved`, route: '/account/addresses' },
       ],
     },
     {
