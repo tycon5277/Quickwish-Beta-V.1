@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { useAuth } from '../_layout';
+import { useAppStore } from '../store';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
@@ -24,6 +25,7 @@ interface Wish {
 export default function HomeScreen() {
   const router = useRouter();
   const { user, sessionToken } = useAuth();
+  const { wishesRefreshTrigger, setUserLocation, locationPermissionChecked, setLocationPermissionChecked } = useAppStore();
   const [location, setLocation] = useState<string>('Fetching location...');
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,8 +36,14 @@ export default function HomeScreen() {
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status !== 'granted') {
         setLocation('Location not enabled');
+        // Check if we need to show permission screen
+        if (!locationPermissionChecked) {
+          router.push('/(auth)/permissions');
+          setLocationPermissionChecked(true);
+        }
         return;
       }
+      setLocationPermissionChecked(true);
       const loc = await Location.getCurrentPositionAsync({});
       const [address] = await Location.reverseGeocodeAsync({
         latitude: loc.coords.latitude,
@@ -46,11 +54,16 @@ export default function HomeScreen() {
           .filter(Boolean)
           .join(', ');
         setLocation(locationStr || 'Unknown location');
+        setUserLocation({
+          lat: loc.coords.latitude,
+          lng: loc.coords.longitude,
+          address: locationStr || 'Current Location',
+        });
       }
     } catch (error) {
       setLocation('Unable to get location');
     }
-  }, []);
+  }, [locationPermissionChecked, setLocationPermissionChecked, setUserLocation, router]);
 
   const fetchWishes = useCallback(async () => {
     if (!sessionToken) return;
@@ -66,10 +79,25 @@ export default function HomeScreen() {
     }
   }, [sessionToken]);
 
+  // Initial load
   useEffect(() => {
     fetchLocation();
     fetchWishes();
-  }, [fetchLocation, fetchWishes]);
+  }, []);
+
+  // Refresh when wishesRefreshTrigger changes (after creating a wish)
+  useEffect(() => {
+    if (wishesRefreshTrigger > 0) {
+      fetchWishes();
+    }
+  }, [wishesRefreshTrigger, fetchWishes]);
+
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchWishes();
+    }, [fetchWishes])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -110,10 +138,11 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'User'}</Text>
-          <View style={styles.locationRow}>
+          <TouchableOpacity style={styles.locationRow} onPress={fetchLocation}>
             <Ionicons name="location" size={14} color="#6B7280" />
             <Text style={styles.locationText} numberOfLines={1}>{location}</Text>
-          </View>
+            <Ionicons name="refresh-outline" size={12} color="#9CA3AF" />
+          </TouchableOpacity>
         </View>
         <TouchableOpacity 
           style={styles.wishboxButton}
@@ -210,6 +239,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))
         )}
+        <View style={{ height: 20 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -247,7 +277,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B7280',
     marginLeft: 4,
-    maxWidth: 200,
+    marginRight: 4,
+    maxWidth: 180,
   },
   wishboxButton: {
     width: 48,
@@ -284,11 +315,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginTop: 20,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
   },
   makeWishIcon: {
     width: 56,

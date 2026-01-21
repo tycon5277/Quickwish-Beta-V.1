@@ -1,14 +1,25 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, BackHandler } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import { useAppStore } from '../store';
 
 export default function PermissionsScreen() {
   const router = useRouter();
+  const { setLocationPermissionChecked, setUserLocation } = useAppStore();
   const [isLoading, setIsLoading] = useState(false);
   const [locationGranted, setLocationGranted] = useState(false);
+
+  // Prevent going back without making a choice
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      skipPermission();
+      return true;
+    });
+    return () => backHandler.remove();
+  }, []);
 
   const requestLocationPermission = async () => {
     setIsLoading(true);
@@ -16,15 +27,38 @@ export default function PermissionsScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
         setLocationGranted(true);
+        setLocationPermissionChecked(true);
+        
+        // Get current location
+        try {
+          const loc = await Location.getCurrentPositionAsync({});
+          const [address] = await Location.reverseGeocodeAsync({
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+          });
+          
+          const locationStr = [address?.district, address?.city, address?.region]
+            .filter(Boolean)
+            .join(', ');
+          
+          setUserLocation({
+            lat: loc.coords.latitude,
+            lng: loc.coords.longitude,
+            address: locationStr || 'Current Location',
+          });
+        } catch (e) {
+          console.log('Could not get location details');
+        }
+        
         setTimeout(() => {
           router.replace('/(main)/home');
-        }, 500);
+        }, 800);
       } else {
         Alert.alert(
           'Permission Required',
-          'Location permission is needed to show nearby helpers and create location-based wishes.',
+          'Location permission helps us show nearby helpers and create location-based wishes. You can enable it later in settings.',
           [
-            { text: 'Skip for now', onPress: () => router.replace('/(main)/home') },
+            { text: 'Skip for now', onPress: skipPermission },
             { text: 'Try Again', onPress: requestLocationPermission },
           ]
         );
@@ -38,6 +72,7 @@ export default function PermissionsScreen() {
   };
 
   const skipPermission = () => {
+    setLocationPermissionChecked(true);
     router.replace('/(main)/home');
   };
 
@@ -139,11 +174,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#6366F1',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
   },
   title: {
     fontSize: 28,
@@ -207,11 +237,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     marginBottom: 12,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
   primaryButtonText: {
     fontSize: 16,

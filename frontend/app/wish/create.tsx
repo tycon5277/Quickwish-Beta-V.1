@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { useAuth } from '../_layout';
+import { useAppStore } from '../store';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
@@ -27,6 +28,7 @@ export default function CreateWishScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { sessionToken } = useAuth();
+  const { triggerWishesRefresh, userLocation } = useAppStore();
   
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -39,15 +41,17 @@ export default function CreateWishScreen() {
     lat: number;
     lng: number;
     address: string;
-  } | null>(null);
-  const [manualAddress, setManualAddress] = useState('');
+  } | null>(userLocation);
+  const [manualAddress, setManualAddress] = useState(userLocation?.address || '');
   const [radius, setRadius] = useState(5);
   const [remuneration, setRemuneration] = useState('');
   const [isImmediate, setIsImmediate] = useState(true);
   const [scheduledDate, setScheduledDate] = useState('');
 
   useEffect(() => {
-    getCurrentLocation();
+    if (!location) {
+      getCurrentLocation();
+    }
   }, []);
 
   const getCurrentLocation = async () => {
@@ -102,6 +106,9 @@ export default function CreateWishScreen() {
       await axios.post(`${BACKEND_URL}/api/wishes`, wishData, {
         headers: { Authorization: `Bearer ${sessionToken}` }
       });
+
+      // Trigger refresh on home screen
+      triggerWishesRefresh();
 
       Alert.alert(
         'Wish Created!',
