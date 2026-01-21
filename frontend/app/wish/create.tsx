@@ -7,7 +7,7 @@ import * as Location from 'expo-location';
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { useAuth } from '../_layout';
-import { useAppStore } from '../store';
+import { useAppStore } from '../../src/store';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
