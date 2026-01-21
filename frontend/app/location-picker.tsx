@@ -4,9 +4,27 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useAuth } from './_layout';
 import { useAppStore } from '../src/store';
+
+// Conditionally import react-native-maps only on native platforms
+let MapView: any = null;
+let Marker: any = null;
+let PROVIDER_GOOGLE: any = null;
+
+if (Platform.OS !== 'web') {
+  const Maps = require('react-native-maps');
+  MapView = Maps.default;
+  Marker = Maps.Marker;
+  PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
+}
+
+type Region = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAP_HEIGHT = 220;
