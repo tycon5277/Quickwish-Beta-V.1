@@ -187,18 +187,7 @@ class ComprehensiveAPITester:
         except Exception as e:
             self.log_result("auth_apis", "GET /api/auth/me", False, f"Exception: {str(e)}")
         
-        # Test POST /api/auth/logout - Logout
-        try:
-            response = requests.post(f"{API_BASE}/auth/logout", headers=headers, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                self.log_result("auth_apis", "POST /api/auth/logout", True, f"Message: {data.get('message', 'Success')}")
-            else:
-                self.log_result("auth_apis", "POST /api/auth/logout", False, f"Status: {response.status_code}")
-        except Exception as e:
-            self.log_result("auth_apis", "POST /api/auth/logout", False, f"Exception: {str(e)}")
-        
-        # Test unauthorized access
+        # Test unauthorized access first (before logout)
         try:
             response = requests.get(f"{API_BASE}/auth/me", timeout=10)
             if response.status_code == 401:
@@ -207,6 +196,19 @@ class ComprehensiveAPITester:
                 self.log_result("auth_apis", "GET /api/auth/me (no auth)", False, f"Expected 401, got {response.status_code}")
         except Exception as e:
             self.log_result("auth_apis", "GET /api/auth/me (no auth)", False, f"Exception: {str(e)}")
+        
+        # Test POST /api/auth/logout - Logout (this will invalidate the session)
+        try:
+            response = requests.post(f"{API_BASE}/auth/logout", headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                self.log_result("auth_apis", "POST /api/auth/logout", True, f"Message: {data.get('message', 'Success')}")
+                # Session is now invalid, need to create a new one for protected tests
+                self.session_token = None
+            else:
+                self.log_result("auth_apis", "POST /api/auth/logout", False, f"Status: {response.status_code}")
+        except Exception as e:
+            self.log_result("auth_apis", "POST /api/auth/logout", False, f"Exception: {str(e)}")
     
     def test_wish_apis(self):
         """Test all wish-related APIs"""
