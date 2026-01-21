@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { useAuth } from './_layout';
 import { useAppStore } from '../src/store';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const MAP_HEIGHT = 220;
+const MAP_HEIGHT = 280;
 
 interface SavedAddress {
   id: string;
@@ -24,42 +25,17 @@ interface LocationData {
   address: string;
 }
 
-// Web fallback map placeholder
-const WebMapPlaceholder = ({ pinLocation, onSelectLocation }: { 
-  pinLocation: LocationData | null;
-  onSelectLocation: () => void;
-}) => (
-  <View style={styles.webMapPlaceholder}>
-    <View style={styles.webMapContent}>
-      <Ionicons name="map" size={48} color="#6366F1" />
-      <Text style={styles.webMapTitle}>Map View</Text>
-      <Text style={styles.webMapSubtext}>
-        {pinLocation 
-          ? `📍 ${pinLocation.address}` 
-          : 'Maps work best in the mobile app'}
-      </Text>
-      {pinLocation && (
-        <TouchableOpacity 
-          style={styles.webMapSelectButton}
-          onPress={onSelectLocation}
-        >
-          <Text style={styles.webMapSelectText}>Use This Location</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  </View>
-);
-
 export default function LocationPickerScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { userLocation, setUserLocation } = useAppStore();
   
   const [isLoadingGPS, setIsLoadingGPS] = useState(false);
-  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const [currentGPSLocation, setCurrentGPSLocation] = useState<LocationData | null>(null);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
-  const [pinLocation, setPinLocation] = useState<LocationData | null>(null);
+  const [pinLocation, setPinLocation] = useState<LocationData | null>(userLocation);
+  const [mapKey, setMapKey] = useState(0);
+  const webViewRef = useRef<WebView>(null);
 
   useEffect(() => {
     if (user?.addresses) {
@@ -67,11 +43,7 @@ export default function LocationPickerScreen() {
     }
   }, [user]);
 
-  // Initialize with user's current location or saved location
   useEffect(() => {
-    if (userLocation) {
-      setPinLocation(userLocation);
-    }
     fetchCurrentLocation();
   }, []);
 
@@ -113,15 +85,21 @@ export default function LocationPickerScreen() {
       
       setCurrentGPSLocation(locationData);
       
-      // Update pin if no pin location set
       if (!pinLocation) {
         setPinLocation(locationData);
+        setMapKey(prev => prev + 1);
       }
     } catch (error) {
       console.error('Error getting location:', error);
-      // Don't show alert on web as geolocation may be blocked
-      if (Platform.OS !== 'web') {
-        Alert.alert('Error', 'Could not get current location');
+      // Set default location (Delhi, India)
+      const defaultLocation: LocationData = {
+        lat: 28.6139,
+        lng: 77.2090,
+        address: 'New Delhi, India',
+      };
+      setCurrentGPSLocation(defaultLocation);
+      if (!pinLocation) {
+        setPinLocation(defaultLocation);
       }
     } finally {
       setIsLoadingGPS(false);
@@ -142,21 +120,19 @@ export default function LocationPickerScreen() {
   const selectCurrentGPS = () => {
     if (currentGPSLocation) {
       setPinLocation(currentGPSLocation);
+      setMapKey(prev => prev + 1);
       selectLocation(currentGPSLocation);
     }
   };
 
   const selectSavedAddress = (addr: SavedAddress) => {
     const locationData: LocationData = {
-      lat: addr.lat || 0,
-      lng: addr.lng || 0,
+      lat: addr.lat || 28.6139,
+      lng: addr.lng || 77.2090,
       address: addr.address,
     };
-    
-    if (addr.lat && addr.lng) {
-      setPinLocation(locationData);
-    }
-    
+    setPinLocation(locationData);
+    setMapKey(prev => prev + 1);
     selectLocation(locationData);
   };
 
@@ -167,6 +143,122 @@ export default function LocationPickerScreen() {
       case 'work': return 'briefcase';
       default: return 'location';
     }
+  };
+
+  // Handle messages from WebView (pin drag events)
+  const handleWebViewMessage = async (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'locationSelected') {
+        const { lat, lng } = data;
+        
+        // Reverse geocode to get address
+        try {
+          const [address] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+          const addressStr = [
+            address?.name,
+            address?.street,
+            address?.district,
+            address?.city,
+          ].filter(Boolean).join(', ');
+          
+          setPinLocation({
+            lat,
+            lng,
+            address: addressStr || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+          });
+        } catch (error) {
+          setPinLocation({
+            lat,
+            lng,
+            address: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing WebView message:', error);
+    }
+  };
+
+  // Generate Leaflet HTML for the map
+  const getMapHTML = () => {
+    const lat = pinLocation?.lat || currentGPSLocation?.lat || 28.6139;
+    const lng = pinLocation?.lng || currentGPSLocation?.lng || 77.2090;
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          html, body, #map { width: 100%; height: 100%; }
+          .custom-marker {
+            background: none;
+            border: none;
+          }
+          .marker-pin {
+            width: 30px;
+            height: 42px;
+            position: relative;
+          }
+          .marker-pin svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+          }
+        </style>
+      </head>
+      <body>
+        <div id="map"></div>
+        <script>
+          var map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false
+          }).setView([${lat}, ${lng}], 15);
+          
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+          }).addTo(map);
+          
+          // Custom icon
+          var customIcon = L.divIcon({
+            className: 'custom-marker',
+            html: '<div class="marker-pin"><svg viewBox="0 0 24 36" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C5.373 0 0 5.373 0 12c0 9 12 24 12 24s12-15 12-24c0-6.627-5.373-12-12-12z" fill="#EF4444"/><circle cx="12" cy="12" r="6" fill="white"/></svg></div>',
+            iconSize: [30, 42],
+            iconAnchor: [15, 42],
+          });
+          
+          var marker = L.marker([${lat}, ${lng}], { 
+            icon: customIcon,
+            draggable: true 
+          }).addTo(map);
+          
+          // Handle marker drag
+          marker.on('dragend', function(e) {
+            var pos = marker.getLatLng();
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'locationSelected',
+              lat: pos.lat,
+              lng: pos.lng
+            }));
+          });
+          
+          // Handle map click
+          map.on('click', function(e) {
+            marker.setLatLng(e.latlng);
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'locationSelected',
+              lat: e.latlng.lat,
+              lng: e.latlng.lng
+            }));
+          });
+        </script>
+      </body>
+      </html>
+    `;
   };
 
   return (
@@ -183,6 +275,46 @@ export default function LocationPickerScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Map Section */}
+        <View style={styles.section}>
+          <View style={styles.mapHeader}>
+            <Text style={styles.sectionTitle}>Fine-tune Location</Text>
+            <Text style={styles.mapHint}>Drag pin or tap map to adjust</Text>
+          </View>
+          
+          <View style={styles.mapContainer}>
+            <WebView
+              key={mapKey}
+              ref={webViewRef}
+              source={{ html: getMapHTML() }}
+              style={styles.map}
+              scrollEnabled={false}
+              onMessage={handleWebViewMessage}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+            />
+          </View>
+          
+          {/* Selected Location Display */}
+          {pinLocation && (
+            <View style={styles.selectedLocationCard}>
+              <View style={styles.selectedLocationInfo}>
+                <Ionicons name="location" size={20} color="#EF4444" />
+                <Text style={styles.selectedLocationText} numberOfLines={2}>
+                  {pinLocation.address}
+                </Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.confirmLocationButton}
+                onPress={selectPinLocation}
+              >
+                <Ionicons name="checkmark" size={18} color="#fff" />
+                <Text style={styles.confirmLocationText}>Use</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
         {/* Current GPS Location */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Current Location</Text>
@@ -217,27 +349,10 @@ export default function LocationPickerScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Map Section - Only show placeholder on web */}
-        <View style={styles.section}>
-          <View style={styles.mapHeader}>
-            <Text style={styles.sectionTitle}>Fine-tune Location</Text>
-            <Text style={styles.mapHint}>
-              {Platform.OS === 'web' ? 'Use mobile app for map' : 'Drag pin or tap map to adjust'}
-            </Text>
-          </View>
-          
-          <View style={styles.mapContainer}>
-            <WebMapPlaceholder 
-              pinLocation={pinLocation} 
-              onSelectLocation={selectPinLocation}
-            />
-          </View>
-        </View>
-
         {/* Currently Selected */}
         {userLocation && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Currently Selected</Text>
+            <Text style={styles.sectionTitle}>Currently Active</Text>
             <View style={[styles.locationCard, styles.selectedCard]}>
               <View style={[styles.locationIcon, styles.selectedIcon]}>
                 <Ionicons name="checkmark-circle" size={24} color="#fff" />
@@ -362,6 +477,61 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6366F1',
   },
+  // Map styles
+  mapHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  mapHint: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  mapContainer: {
+    height: MAP_HEIGHT,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#E5E7EB',
+  },
+  map: {
+    flex: 1,
+  },
+  selectedLocationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  selectedLocationInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  selectedLocationText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+    marginLeft: 8,
+  },
+  confirmLocationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  confirmLocationText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 4,
+  },
   locationCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -416,60 +586,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  // Map styles
-  mapHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  mapHint: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  mapContainer: {
-    height: MAP_HEIGHT,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#E5E7EB',
-  },
-  // Web map placeholder styles
-  webMapPlaceholder: {
-    flex: 1,
-    backgroundColor: '#EEF2FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 16,
-  },
-  webMapContent: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  webMapTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginTop: 12,
-  },
-  webMapSubtext: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 6,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
-  webMapSelectButton: {
-    backgroundColor: '#6366F1',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 16,
-  },
-  webMapSelectText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
   },
   emptyState: {
     alignItems: 'center',
