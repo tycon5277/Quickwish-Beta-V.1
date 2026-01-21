@@ -190,11 +190,14 @@ frontend:
     file: "/app/frontend/app/(auth)/login.tsx, register.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "Google OAuth login screens implemented"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Auth screens working perfectly on mobile (390x844). Welcome screen loads with all elements (title, buttons, feature list). Navigation flows work: Welcome→Register, Welcome→Login, Register↔Login via footer links. Google OAuth buttons present ('Sign up with Google', 'Continue with Google'). Back button visible and functional. Mobile responsive, no errors, touch-friendly UI. Ready for Google OAuth backend integration."
 
   - task: "Home screen with Make a Wish"
     implemented: true
