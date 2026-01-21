@@ -183,16 +183,20 @@ export default function HomeScreen() {
   const displayWishes = activeWishes.slice(0, 5);
   const hasMoreWishes = activeWishes.length > 5;
 
+  // Get location from store if available
+  const { userLocation } = useAppStore();
+  const displayLocation = userLocation?.address || location;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'User'}</Text>
-          <TouchableOpacity style={styles.locationRow} onPress={fetchLocation}>
-            <Ionicons name="location" size={14} color="#6B7280" />
-            <Text style={styles.locationText} numberOfLines={1}>{location}</Text>
-            <Ionicons name="refresh-outline" size={12} color="#9CA3AF" />
+          <TouchableOpacity style={styles.locationRow} onPress={() => router.push('/location-picker')}>
+            <Ionicons name="location" size={14} color="#6366F1" />
+            <Text style={styles.locationText} numberOfLines={1}>{displayLocation}</Text>
+            <Ionicons name="chevron-down" size={14} color="#6366F1" />
           </TouchableOpacity>
         </View>
         <TouchableOpacity 
