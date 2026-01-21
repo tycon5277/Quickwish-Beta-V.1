@@ -266,6 +266,29 @@ async def update_phone(phone_data: PhoneUpdate, current_user: User = Depends(req
     )
     return {"message": "Phone updated successfully"}
 
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    age: Optional[int] = None
+    picture: Optional[str] = None
+
+@api_router.put("/users/profile")
+async def update_profile(profile_data: ProfileUpdate, current_user: User = Depends(require_auth)):
+    """Update user profile (name, age, picture)"""
+    update_fields = {}
+    if profile_data.name is not None:
+        update_fields["name"] = profile_data.name
+    if profile_data.age is not None:
+        update_fields["age"] = profile_data.age
+    if profile_data.picture is not None:
+        update_fields["picture"] = profile_data.picture
+    
+    if update_fields:
+        await db.users.update_one(
+            {"user_id": current_user.user_id},
+            {"$set": update_fields}
+        )
+    return {"message": "Profile updated successfully"}
+
 @api_router.post("/users/addresses")
 async def add_address(address: AddressCreate, current_user: User = Depends(require_auth)):
     """Add user address"""
