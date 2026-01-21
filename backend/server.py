@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, Cookie
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -6,10 +6,10 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 import uuid
-from datetime import datetime
-
+from datetime import datetime, timezone, timedelta
+import httpx
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -19,38 +19,550 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
+# Create the main app
 app = FastAPI()
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-# Define Models
-class StatusCheck(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+# ===================== MODELS =====================
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+class User(BaseModel):
+    user_id: str
+    email: str
+    name: str
+    picture: Optional[str] = None
+    phone: Optional[str] = None
+    addresses: List[dict] = []
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-# Add your routes to the router instead of directly to app
+class UserSession(BaseModel):
+    user_id: str
+    session_token: str
+    expires_at: datetime
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SessionDataResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    picture: Optional[str] = None
+    session_token: str
+
+class WishCreate(BaseModel):
+    wish_type: str
+    title: str
+    description: Optional[str] = None
+    location: dict  # {lat, lng, address}
+    radius_km: float = 5.0
+    remuneration: float
+    is_immediate: bool = True
+    scheduled_time: Optional[datetime] = None
+
+class Wish(BaseModel):
+    wish_id: str
+    user_id: str
+    wish_type: str
+    title: str
+    description: Optional[str] = None
+    location: dict
+    radius_km: float
+    remuneration: float
+    is_immediate: bool
+    scheduled_time: Optional[datetime] = None
+    status: str = "pending"  # pending, accepted, in_progress, completed, cancelled
+    accepted_by: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ChatRoom(BaseModel):
+    room_id: str
+    wish_id: str
+    wisher_id: str
+    agent_id: str
+    status: str = "active"  # active, approved, completed, cancelled
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Message(BaseModel):
+    message_id: str
+    room_id: str
+    sender_id: str
+    sender_type: str  # wisher or agent
+    content: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class MessageCreate(BaseModel):
+    content: str
+
+class LocalBusiness(BaseModel):
+    business_id: str
+    name: str
+    category: str
+    description: Optional[str] = None
+    image: Optional[str] = None
+    location: dict
+    rating: float = 0.0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ExplorePost(BaseModel):
+    post_id: str
+    title: str
+    content: str
+    post_type: str  # celebration, milestone, event, news
+    image: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class AddressCreate(BaseModel):
+    label: str  # home, office, etc.
+    address: str
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+
+class PhoneUpdate(BaseModel):
+    phone: str
+
+# ===================== AUTH HELPERS =====================
+
+async def get_current_user(request: Request, session_token: Optional[str] = Cookie(default=None)) -> Optional[User]:
+    """Get current user from session token (cookie or header)"""
+    token = session_token
+    
+    # Fallback to Authorization header
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+    
+    if not token:
+        return None
+    
+    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not session:
+        return None
+    
+    # Check expiry with timezone handling
+    expires_at = session["expires_at"]
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    
+    if expires_at < datetime.now(timezone.utc):
+        return None
+    
+    user_doc = await db.users.find_one({"user_id": session["user_id"]}, {"_id": 0})
+    if user_doc:
+        return User(**user_doc)
+    return None
+
+async def require_auth(request: Request, session_token: Optional[str] = Cookie(default=None)) -> User:
+    """Require authenticated user"""
+    user = await get_current_user(request, session_token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user
+
+# ===================== AUTH ENDPOINTS =====================
+
+@api_router.post("/auth/session")
+async def create_session(request: Request, response: Response):
+    """Exchange session_id for session_token"""
+    session_id = request.headers.get("X-Session-ID")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Missing X-Session-ID header")
+    
+    # Call Emergent Auth API
+    async with httpx.AsyncClient() as client:
+        try:
+            auth_response = await client.get(
+                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+                headers={"X-Session-ID": session_id}
+            )
+            if auth_response.status_code != 200:
+                raise HTTPException(status_code=401, detail="Invalid session")
+            
+            user_data = auth_response.json()
+        except Exception as e:
+            logger.error(f"Auth API error: {e}")
+            raise HTTPException(status_code=500, detail="Authentication service error")
+    
+    session_data = SessionDataResponse(**user_data)
+    
+    # Check if user exists
+    existing_user = await db.users.find_one({"email": session_data.email}, {"_id": 0})
+    
+    if existing_user:
+        user_id = existing_user["user_id"]
+    else:
+        # Create new user
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        new_user = {
+            "user_id": user_id,
+            "email": session_data.email,
+            "name": session_data.name,
+            "picture": session_data.picture,
+            "phone": None,
+            "addresses": [],
+            "created_at": datetime.now(timezone.utc)
+        }
+        await db.users.insert_one(new_user)
+    
+    # Store session
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    session_doc = {
+        "user_id": user_id,
+        "session_token": session_data.session_token,
+        "expires_at": expires_at,
+        "created_at": datetime.now(timezone.utc)
+    }
+    await db.user_sessions.insert_one(session_doc)
+    
+    # Set cookie
+    response.set_cookie(
+        key="session_token",
+        value=session_data.session_token,
+        httponly=True,
+        secure=True,
+        samesite="none",
+        max_age=7*24*60*60,
+        path="/"
+    )
+    
+    user_doc = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    return {"user": user_doc, "session_token": session_data.session_token}
+
+@api_router.get("/auth/me")
+async def get_me(current_user: User = Depends(require_auth)):
+    """Get current authenticated user"""
+    return current_user
+
+@api_router.post("/auth/logout")
+async def logout(request: Request, response: Response, session_token: Optional[str] = Cookie(default=None)):
+    """Logout user"""
+    token = session_token
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+    
+    if token:
+        await db.user_sessions.delete_one({"session_token": token})
+    
+    response.delete_cookie(key="session_token", path="/")
+    return {"message": "Logged out successfully"}
+
+# ===================== USER ENDPOINTS =====================
+
+@api_router.put("/users/phone")
+async def update_phone(phone_data: PhoneUpdate, current_user: User = Depends(require_auth)):
+    """Update user phone number"""
+    await db.users.update_one(
+        {"user_id": current_user.user_id},
+        {"$set": {"phone": phone_data.phone}}
+    )
+    return {"message": "Phone updated successfully"}
+
+@api_router.post("/users/addresses")
+async def add_address(address: AddressCreate, current_user: User = Depends(require_auth)):
+    """Add user address"""
+    address_doc = address.dict()
+    address_doc["id"] = str(uuid.uuid4())
+    
+    await db.users.update_one(
+        {"user_id": current_user.user_id},
+        {"$push": {"addresses": address_doc}}
+    )
+    return {"message": "Address added", "address": address_doc}
+
+@api_router.delete("/users/addresses/{address_id}")
+async def delete_address(address_id: str, current_user: User = Depends(require_auth)):
+    """Delete user address"""
+    await db.users.update_one(
+        {"user_id": current_user.user_id},
+        {"$pull": {"addresses": {"id": address_id}}}
+    )
+    return {"message": "Address deleted"}
+
+# ===================== WISH ENDPOINTS =====================
+
+@api_router.post("/wishes", response_model=Wish)
+async def create_wish(wish_data: WishCreate, current_user: User = Depends(require_auth)):
+    """Create a new wish"""
+    wish_id = f"wish_{uuid.uuid4().hex[:12]}"
+    wish = Wish(
+        wish_id=wish_id,
+        user_id=current_user.user_id,
+        **wish_data.dict()
+    )
+    await db.wishes.insert_one(wish.dict())
+    return wish
+
+@api_router.get("/wishes", response_model=List[Wish])
+async def get_my_wishes(current_user: User = Depends(require_auth)):
+    """Get all wishes for current user"""
+    wishes = await db.wishes.find(
+        {"user_id": current_user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return [Wish(**w) for w in wishes]
+
+@api_router.get("/wishes/{wish_id}", response_model=Wish)
+async def get_wish(wish_id: str, current_user: User = Depends(require_auth)):
+    """Get a specific wish"""
+    wish = await db.wishes.find_one({"wish_id": wish_id}, {"_id": 0})
+    if not wish:
+        raise HTTPException(status_code=404, detail="Wish not found")
+    return Wish(**wish)
+
+@api_router.put("/wishes/{wish_id}/cancel")
+async def cancel_wish(wish_id: str, current_user: User = Depends(require_auth)):
+    """Cancel a wish"""
+    result = await db.wishes.update_one(
+        {"wish_id": wish_id, "user_id": current_user.user_id, "status": "pending"},
+        {"$set": {"status": "cancelled"}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=400, detail="Cannot cancel this wish")
+    return {"message": "Wish cancelled"}
+
+# ===================== CHAT ENDPOINTS =====================
+
+@api_router.get("/chat/rooms", response_model=List[dict])
+async def get_chat_rooms(current_user: User = Depends(require_auth)):
+    """Get all chat rooms for current user (wisher)"""
+    rooms = await db.chat_rooms.find(
+        {"wisher_id": current_user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    # Enrich with wish and last message info
+    enriched_rooms = []
+    for room in rooms:
+        wish = await db.wishes.find_one({"wish_id": room["wish_id"]}, {"_id": 0})
+        last_message = await db.messages.find_one(
+            {"room_id": room["room_id"]},
+            {"_id": 0}
+        )
+        if last_message:
+            last_message = await db.messages.find(
+                {"room_id": room["room_id"]},
+                {"_id": 0}
+            ).sort("created_at", -1).limit(1).to_list(1)
+            last_message = last_message[0] if last_message else None
+        
+        enriched_rooms.append({
+            **room,
+            "wish": wish,
+            "last_message": last_message
+        })
+    
+    return enriched_rooms
+
+@api_router.get("/chat/rooms/{room_id}/messages", response_model=List[Message])
+async def get_messages(room_id: str, current_user: User = Depends(require_auth)):
+    """Get messages for a chat room"""
+    # Verify user has access to this room
+    room = await db.chat_rooms.find_one(
+        {"room_id": room_id, "wisher_id": current_user.user_id},
+        {"_id": 0}
+    )
+    if not room:
+        raise HTTPException(status_code=404, detail="Chat room not found")
+    
+    messages = await db.messages.find(
+        {"room_id": room_id},
+        {"_id": 0}
+    ).sort("created_at", 1).to_list(500)
+    
+    return [Message(**m) for m in messages]
+
+@api_router.post("/chat/rooms/{room_id}/messages", response_model=Message)
+async def send_message(room_id: str, msg: MessageCreate, current_user: User = Depends(require_auth)):
+    """Send a message in a chat room"""
+    # Verify user has access
+    room = await db.chat_rooms.find_one(
+        {"room_id": room_id, "wisher_id": current_user.user_id},
+        {"_id": 0}
+    )
+    if not room:
+        raise HTTPException(status_code=404, detail="Chat room not found")
+    
+    message = Message(
+        message_id=f"msg_{uuid.uuid4().hex[:12]}",
+        room_id=room_id,
+        sender_id=current_user.user_id,
+        sender_type="wisher",
+        content=msg.content
+    )
+    await db.messages.insert_one(message.dict())
+    return message
+
+@api_router.put("/chat/rooms/{room_id}/approve")
+async def approve_deal(room_id: str, current_user: User = Depends(require_auth)):
+    """Approve a deal with fulfillment agent"""
+    room = await db.chat_rooms.find_one(
+        {"room_id": room_id, "wisher_id": current_user.user_id},
+        {"_id": 0}
+    )
+    if not room:
+        raise HTTPException(status_code=404, detail="Chat room not found")
+    
+    # Update room status
+    await db.chat_rooms.update_one(
+        {"room_id": room_id},
+        {"$set": {"status": "approved"}}
+    )
+    
+    # Update wish status
+    await db.wishes.update_one(
+        {"wish_id": room["wish_id"]},
+        {"$set": {"status": "in_progress", "accepted_by": room["agent_id"]}}
+    )
+    
+    return {"message": "Deal approved!"}
+
+# ===================== EXPLORE ENDPOINTS =====================
+
+@api_router.get("/explore", response_model=List[ExplorePost])
+async def get_explore_posts():
+    """Get explore posts (public)"""
+    posts = await db.explore_posts.find({}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    return [ExplorePost(**p) for p in posts]
+
+# ===================== LOCAL HUB ENDPOINTS =====================
+
+@api_router.get("/localhub", response_model=List[LocalBusiness])
+async def get_local_businesses(category: Optional[str] = None):
+    """Get local businesses"""
+    query = {}
+    if category:
+        query["category"] = category
+    
+    businesses = await db.local_businesses.find(query, {"_id": 0}).to_list(100)
+    return [LocalBusiness(**b) for b in businesses]
+
+@api_router.get("/localhub/categories")
+async def get_business_categories():
+    """Get all business categories"""
+    categories = await db.local_businesses.distinct("category")
+    return categories
+
+# ===================== SEED DATA =====================
+
+@api_router.post("/seed")
+async def seed_data():
+    """Seed sample data for testing"""
+    # Seed explore posts
+    explore_posts = [
+        {
+            "post_id": f"post_{uuid.uuid4().hex[:8]}",
+            "title": "Local Hero: Ramesh completes 1000th delivery! 🎉",
+            "content": "Ramesh Kumar, a fulfillment agent from Sector 5, has completed his 1000th delivery task. Community members praised his dedication and reliability.",
+            "post_type": "milestone",
+            "image": None,
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "post_id": f"post_{uuid.uuid4().hex[:8]}",
+            "title": "Weekend Community Market",
+            "content": "Join us this Saturday at Central Park for our monthly community market. Fresh produce, handicrafts, and local delicacies!",
+            "post_type": "event",
+            "image": None,
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "post_id": f"post_{uuid.uuid4().hex[:8]}",
+            "title": "New Feature: Schedule Your Wishes!",
+            "content": "You can now schedule your wishes for a later time. Perfect for planning ahead!",
+            "post_type": "news",
+            "image": None,
+            "created_at": datetime.now(timezone.utc)
+        }
+    ]
+    
+    for post in explore_posts:
+        await db.explore_posts.update_one(
+            {"post_id": post["post_id"]},
+            {"$set": post},
+            upsert=True
+        )
+    
+    # Seed local businesses
+    businesses = [
+        {
+            "business_id": f"biz_{uuid.uuid4().hex[:8]}",
+            "name": "Fresh Fruits by Lakshmi",
+            "category": "Fruits & Vegetables",
+            "description": "Fresh seasonal fruits delivered to your doorstep",
+            "image": None,
+            "location": {"lat": 12.9716, "lng": 77.5946, "address": "Sector 3, Local Market"},
+            "rating": 4.8,
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "business_id": f"biz_{uuid.uuid4().hex[:8]}",
+            "name": "Amma's Kitchen",
+            "category": "Home Kitchen",
+            "description": "Authentic home-cooked meals with love",
+            "image": None,
+            "location": {"lat": 12.9720, "lng": 77.5950, "address": "Block B, Apartment 204"},
+            "rating": 4.9,
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "business_id": f"biz_{uuid.uuid4().hex[:8]}",
+            "name": "Ravi's Handicrafts",
+            "category": "Artisan",
+            "description": "Handmade traditional crafts and decorations",
+            "image": None,
+            "location": {"lat": 12.9710, "lng": 77.5940, "address": "Craft Lane, Shop 12"},
+            "rating": 4.7,
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "business_id": f"biz_{uuid.uuid4().hex[:8]}",
+            "name": "Quick Pharmacy",
+            "category": "Pharmacy",
+            "description": "24/7 medicine delivery in your area",
+            "image": None,
+            "location": {"lat": 12.9725, "lng": 77.5955, "address": "Main Road, Near Bus Stop"},
+            "rating": 4.6,
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "business_id": f"biz_{uuid.uuid4().hex[:8]}",
+            "name": "Green Grocery",
+            "category": "Grocery",
+            "description": "Daily essentials and grocery items",
+            "image": None,
+            "location": {"lat": 12.9718, "lng": 77.5948, "address": "Sector 2, Shop 5"},
+            "rating": 4.5,
+            "created_at": datetime.now(timezone.utc)
+        }
+    ]
+    
+    for biz in businesses:
+        await db.local_businesses.update_one(
+            {"business_id": biz["business_id"]},
+            {"$set": biz},
+            upsert=True
+        )
+    
+    return {"message": "Sample data seeded successfully"}
+
+# ===================== HEALTH CHECK =====================
+
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "QuickWish API is running", "version": "1.0.0"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+@api_router.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -62,13 +574,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
