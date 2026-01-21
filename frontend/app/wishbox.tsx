@@ -155,7 +155,11 @@ export default function WishboxScreen() {
           </View>
         ) : (
           filteredWishes.map((wish) => (
-            <TouchableOpacity key={wish.wish_id} style={styles.wishCard}>
+            <TouchableOpacity 
+              key={wish.wish_id} 
+              style={styles.wishCard}
+              onPress={() => router.push(`/wish/${wish.wish_id}?from=wishbox`)}
+            >
               <View style={styles.wishHeader}>
                 <View style={styles.wishTypeIcon}>
                   <Ionicons name={getWishTypeIcon(wish.wish_type) as any} size={24} color="#6366F1" />
