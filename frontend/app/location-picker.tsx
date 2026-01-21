@@ -7,25 +7,6 @@ import * as Location from 'expo-location';
 import { useAuth } from './_layout';
 import { useAppStore } from '../src/store';
 
-// Conditionally import react-native-maps only on native platforms
-let MapView: any = null;
-let Marker: any = null;
-let PROVIDER_GOOGLE: any = null;
-
-if (Platform.OS !== 'web') {
-  const Maps = require('react-native-maps');
-  MapView = Maps.default;
-  Marker = Maps.Marker;
-  PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
-}
-
-type Region = {
-  latitude: number;
-  longitude: number;
-  latitudeDelta: number;
-  longitudeDelta: number;
-};
-
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAP_HEIGHT = 220;
 
@@ -43,26 +24,42 @@ interface LocationData {
   address: string;
 }
 
+// Web fallback map placeholder
+const WebMapPlaceholder = ({ pinLocation, onSelectLocation }: { 
+  pinLocation: LocationData | null;
+  onSelectLocation: () => void;
+}) => (
+  <View style={styles.webMapPlaceholder}>
+    <View style={styles.webMapContent}>
+      <Ionicons name="map" size={48} color="#6366F1" />
+      <Text style={styles.webMapTitle}>Map View</Text>
+      <Text style={styles.webMapSubtext}>
+        {pinLocation 
+          ? `📍 ${pinLocation.address}` 
+          : 'Maps work best in the mobile app'}
+      </Text>
+      {pinLocation && (
+        <TouchableOpacity 
+          style={styles.webMapSelectButton}
+          onPress={onSelectLocation}
+        >
+          <Text style={styles.webMapSelectText}>Use This Location</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  </View>
+);
+
 export default function LocationPickerScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { userLocation, setUserLocation } = useAppStore();
-  const mapRef = useRef<MapView>(null);
   
   const [isLoadingGPS, setIsLoadingGPS] = useState(false);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
   const [currentGPSLocation, setCurrentGPSLocation] = useState<LocationData | null>(null);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
-  
-  // Map state
-  const [mapRegion, setMapRegion] = useState<Region>({
-    latitude: 12.9716,
-    longitude: 77.5946,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  });
   const [pinLocation, setPinLocation] = useState<LocationData | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     if (user?.addresses) {
@@ -70,15 +67,9 @@ export default function LocationPickerScreen() {
     }
   }, [user]);
 
-  // Initialize map with user's current location or saved location
+  // Initialize with user's current location or saved location
   useEffect(() => {
     if (userLocation) {
-      setMapRegion({
-        latitude: userLocation.lat,
-        longitude: userLocation.lng,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
       setPinLocation(userLocation);
     }
     fetchCurrentLocation();
@@ -122,74 +113,19 @@ export default function LocationPickerScreen() {
       
       setCurrentGPSLocation(locationData);
       
-      // Update map if no pin location set
+      // Update pin if no pin location set
       if (!pinLocation) {
         setPinLocation(locationData);
-        setMapRegion({
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
       }
     } catch (error) {
       console.error('Error getting location:', error);
-      Alert.alert('Error', 'Could not get current location');
+      // Don't show alert on web as geolocation may be blocked
+      if (Platform.OS !== 'web') {
+        Alert.alert('Error', 'Could not get current location');
+      }
     } finally {
       setIsLoadingGPS(false);
     }
-  };
-
-  const reverseGeocodePin = async (latitude: number, longitude: number) => {
-    setIsLoadingAddress(true);
-    try {
-      const [address] = await Location.reverseGeocodeAsync({
-        latitude,
-        longitude,
-      });
-      
-      const addressStr = [
-        address?.name,
-        address?.street,
-        address?.district,
-        address?.city,
-        address?.region,
-      ].filter(Boolean).join(', ');
-      
-      setPinLocation({
-        lat: latitude,
-        lng: longitude,
-        address: addressStr || 'Selected Location',
-      });
-    } catch (error) {
-      console.error('Error reverse geocoding:', error);
-      setPinLocation({
-        lat: latitude,
-        lng: longitude,
-        address: 'Selected Location',
-      });
-    } finally {
-      setIsLoadingAddress(false);
-    }
-  };
-
-  const handleMarkerDragEnd = (e: any) => {
-    const { latitude, longitude } = e.nativeEvent.coordinate;
-    setIsDragging(false);
-    reverseGeocodePin(latitude, longitude);
-  };
-
-  const handleMapPress = (e: any) => {
-    const { latitude, longitude } = e.nativeEvent.coordinate;
-    reverseGeocodePin(latitude, longitude);
-    
-    // Animate to the new location
-    mapRef.current?.animateToRegion({
-      latitude,
-      longitude,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    }, 300);
   };
 
   const selectLocation = (location: LocationData) => {
@@ -205,64 +141,23 @@ export default function LocationPickerScreen() {
 
   const selectCurrentGPS = () => {
     if (currentGPSLocation) {
-      // Update pin and map to current GPS
       setPinLocation(currentGPSLocation);
-      setMapRegion({
-        latitude: currentGPSLocation.lat,
-        longitude: currentGPSLocation.lng,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
-      mapRef.current?.animateToRegion({
-        latitude: currentGPSLocation.lat,
-        longitude: currentGPSLocation.lng,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 300);
+      selectLocation(currentGPSLocation);
     }
   };
 
   const selectSavedAddress = (addr: SavedAddress) => {
+    const locationData: LocationData = {
+      lat: addr.lat || 0,
+      lng: addr.lng || 0,
+      address: addr.address,
+    };
+    
     if (addr.lat && addr.lng) {
-      // Update pin and map
-      const locationData: LocationData = {
-        lat: addr.lat,
-        lng: addr.lng,
-        address: addr.address,
-      };
       setPinLocation(locationData);
-      setMapRegion({
-        latitude: addr.lat,
-        longitude: addr.lng,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
-      mapRef.current?.animateToRegion({
-        latitude: addr.lat,
-        longitude: addr.lng,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 300);
-    } else {
-      selectLocation({
-        lat: 0,
-        lng: 0,
-        address: addr.address,
-      });
     }
-  };
-
-  const centerOnCurrentLocation = () => {
-    if (currentGPSLocation) {
-      mapRef.current?.animateToRegion({
-        latitude: currentGPSLocation.lat,
-        longitude: currentGPSLocation.lng,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 300);
-    } else {
-      fetchCurrentLocation();
-    }
+    
+    selectLocation(locationData);
   };
 
   const getLabelIcon = (label: string) => {
@@ -322,80 +217,21 @@ export default function LocationPickerScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Map Section */}
+        {/* Map Section - Only show placeholder on web */}
         <View style={styles.section}>
           <View style={styles.mapHeader}>
             <Text style={styles.sectionTitle}>Fine-tune Location</Text>
-            <Text style={styles.mapHint}>Drag pin or tap map to adjust</Text>
+            <Text style={styles.mapHint}>
+              {Platform.OS === 'web' ? 'Use mobile app for map' : 'Drag pin or tap map to adjust'}
+            </Text>
           </View>
           
           <View style={styles.mapContainer}>
-            <MapView
-              ref={mapRef}
-              style={styles.map}
-              provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-              region={mapRegion}
-              onRegionChangeComplete={setMapRegion}
-              onPress={handleMapPress}
-              showsUserLocation={true}
-              showsMyLocationButton={false}
-            >
-              {pinLocation && (
-                <Marker
-                  coordinate={{
-                    latitude: pinLocation.lat,
-                    longitude: pinLocation.lng,
-                  }}
-                  draggable
-                  onDragStart={() => setIsDragging(true)}
-                  onDragEnd={handleMarkerDragEnd}
-                >
-                  <View style={styles.customMarker}>
-                    <View style={styles.markerPin}>
-                      <Ionicons name="location" size={28} color="#fff" />
-                    </View>
-                    <View style={styles.markerShadow} />
-                  </View>
-                </Marker>
-              )}
-            </MapView>
-            
-            {/* Map Controls */}
-            <TouchableOpacity 
-              style={styles.myLocationButton}
-              onPress={centerOnCurrentLocation}
-            >
-              <Ionicons name="locate" size={22} color="#6366F1" />
-            </TouchableOpacity>
-            
-            {/* Loading overlay */}
-            {isLoadingAddress && (
-              <View style={styles.mapLoadingOverlay}>
-                <ActivityIndicator size="small" color="#6366F1" />
-                <Text style={styles.mapLoadingText}>Getting address...</Text>
-              </View>
-            )}
+            <WebMapPlaceholder 
+              pinLocation={pinLocation} 
+              onSelectLocation={selectPinLocation}
+            />
           </View>
-          
-          {/* Pin Location Info */}
-          {pinLocation && (
-            <View style={styles.pinInfoCard}>
-              <View style={styles.pinInfoContent}>
-                <Ionicons name="location" size={20} color="#6366F1" />
-                <Text style={styles.pinInfoAddress} numberOfLines={2}>
-                  {isDragging ? 'Dragging...' : pinLocation.address}
-                </Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.confirmPinButton}
-                onPress={selectPinLocation}
-                disabled={isDragging || isLoadingAddress}
-              >
-                <Text style={styles.confirmPinText}>Confirm</Text>
-                <Ionicons name="checkmark" size={18} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
 
         {/* Currently Selected */}
@@ -598,106 +434,42 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#E5E7EB',
   },
-  map: {
-    width: '100%',
-    height: '100%',
-  },
-  customMarker: {
-    alignItems: 'center',
-  },
-  markerPin: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#6366F1',
+  // Web map placeholder styles
+  webMapPlaceholder: {
+    flex: 1,
+    backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    borderRadius: 16,
   },
-  markerShadow: {
-    width: 20,
-    height: 8,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 10,
-    marginTop: -4,
-  },
-  myLocationButton: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
+  webMapContent: {
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+    padding: 20,
   },
-  mapLoadingOverlay: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  mapLoadingText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginLeft: 8,
-  },
-  pinInfoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  pinInfoContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  pinInfoAddress: {
-    flex: 1,
-    fontSize: 13,
-    color: '#374151',
-    marginLeft: 10,
-  },
-  confirmPinButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#6366F1',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  confirmPinText: {
-    fontSize: 14,
+  webMapTitle: {
+    fontSize: 18,
     fontWeight: '600',
+    color: '#374151',
+    marginTop: 12,
+  },
+  webMapSubtext: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 6,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+  webMapSelectButton: {
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  webMapSelectText: {
     color: '#fff',
-    marginRight: 4,
+    fontWeight: '600',
+    fontSize: 14,
   },
   emptyState: {
     alignItems: 'center',
