@@ -12,7 +12,10 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Find nearby helpers in your area",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Track location for wish fulfillment"
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Track location for wish fulfillment",
+        "NSCameraUsageDescription": "Attach photos to your wish requests",
+        "NSPhotoLibraryUsageDescription": "Attach images from gallery to wishes",
+        "NSMicrophoneUsageDescription": "Record voice notes for wish details"
       }
     },
     "android": {
@@ -23,7 +26,11 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECORD_AUDIO"
       ]
     },
     "web": {
@@ -46,6 +53,19 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow QuickWish to use your location for finding nearby helpers."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Attach images from gallery to wishes",
+          "cameraPermission": "Attach photos to your wish requests"
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Record voice notes for wish details"
         }
       ]
     ],
