@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,7 +25,7 @@ interface Wish {
 export default function HomeScreen() {
   const router = useRouter();
   const { user, sessionToken } = useAuth();
-  const { wishesRefreshTrigger, setUserLocation, locationPermissionChecked, setLocationPermissionChecked } = useAppStore();
+  const { wishesRefreshTrigger, setUserLocation, locationPermissionChecked, setLocationPermissionChecked, triggerWishesRefresh } = useAppStore();
   const [location, setLocation] = useState<string>('Fetching location...');
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,7 +36,6 @@ export default function HomeScreen() {
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status !== 'granted') {
         setLocation('Location not enabled');
-        // Check if we need to show permission screen
         if (!locationPermissionChecked) {
           router.push('/(auth)/permissions');
           setLocationPermissionChecked(true);
@@ -85,7 +84,7 @@ export default function HomeScreen() {
     fetchWishes();
   }, []);
 
-  // Refresh when wishesRefreshTrigger changes (after creating a wish)
+  // Refresh when wishesRefreshTrigger changes
   useEffect(() => {
     if (wishesRefreshTrigger > 0) {
       fetchWishes();
@@ -103,6 +102,56 @@ export default function HomeScreen() {
     setRefreshing(true);
     await Promise.all([fetchLocation(), fetchWishes()]);
     setRefreshing(false);
+  };
+
+  const handleCompleteWish = async (wishId: string) => {
+    Alert.alert(
+      'Complete Wish',
+      'Mark this wish as completed?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Complete',
+          onPress: async () => {
+            try {
+              await axios.put(
+                `${BACKEND_URL}/api/wishes/${wishId}/complete`,
+                {},
+                { headers: { Authorization: `Bearer ${sessionToken}` } }
+              );
+              triggerWishesRefresh();
+            } catch (error: any) {
+              Alert.alert('Error', error.response?.data?.detail || 'Failed to complete wish');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteWish = async (wishId: string) => {
+    Alert.alert(
+      'Delete Wish',
+      'Are you sure you want to delete this wish?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await axios.delete(
+                `${BACKEND_URL}/api/wishes/${wishId}`,
+                { headers: { Authorization: `Bearer ${sessionToken}` } }
+              );
+              triggerWishesRefresh();
+            } catch (error: any) {
+              Alert.alert('Error', error.response?.data?.detail || 'Failed to delete wish');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const getStatusColor = (status: string) => {
@@ -131,9 +180,11 @@ export default function HomeScreen() {
   };
 
   const activeWishes = wishes.filter(w => ['pending', 'accepted', 'in_progress'].includes(w.status));
+  const displayWishes = activeWishes.slice(0, 5);
+  const hasMoreWishes = activeWishes.length > 5;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -162,6 +213,7 @@ export default function HomeScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        showsVerticalScrollIndicator={false}
       >
         {/* Make a Wish Card */}
         <TouchableOpacity
@@ -202,10 +254,10 @@ export default function HomeScreen() {
 
         {/* Active Wishes */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Active Wishes</Text>
+          <Text style={styles.sectionTitleInline}>Active Wishes</Text>
           {activeWishes.length > 0 && (
             <TouchableOpacity onPress={() => router.push('/wishbox')}>
-              <Text style={styles.seeAllText}>See All</Text>
+              <Text style={styles.seeAllText}>See All ({activeWishes.length})</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -219,26 +271,77 @@ export default function HomeScreen() {
             <Text style={styles.emptyStateSubtext}>Make a wish to get started!</Text>
           </View>
         ) : (
-          activeWishes.slice(0, 3).map((wish) => (
-            <TouchableOpacity key={wish.wish_id} style={styles.wishCard}>
-              <View style={styles.wishCardIcon}>
-                <Ionicons name={getWishTypeIcon(wish.wish_type) as any} size={24} color="#6366F1" />
-              </View>
-              <View style={styles.wishCardContent}>
-                <Text style={styles.wishCardTitle} numberOfLines={1}>{wish.title}</Text>
-                <View style={styles.wishCardMeta}>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(wish.status) + '20' }]}>
-                    <Text style={[styles.statusText, { color: getStatusColor(wish.status) }]}>
-                      {wish.status.replace('_', ' ')}
-                    </Text>
+          <View style={styles.wishesContainer}>
+            {displayWishes.map((wish) => (
+              <TouchableOpacity 
+                key={wish.wish_id} 
+                style={styles.wishCard}
+                onPress={() => router.push(`/wish/${wish.wish_id}`)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.wishCardMain}>
+                  <View style={styles.wishCardIcon}>
+                    <Ionicons name={getWishTypeIcon(wish.wish_type) as any} size={24} color="#6366F1" />
                   </View>
-                  <Text style={styles.remunerationText}>₹{wish.remuneration}</Text>
+                  <View style={styles.wishCardContent}>
+                    <Text style={styles.wishCardTitle} numberOfLines={1}>{wish.title}</Text>
+                    <View style={styles.wishCardMeta}>
+                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(wish.status) + '20' }]}>
+                        <Text style={[styles.statusText, { color: getStatusColor(wish.status) }]}>
+                          {wish.status.replace('_', ' ')}
+                        </Text>
+                      </View>
+                      <Text style={styles.remunerationText}>₹{wish.remuneration}</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
                 </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
-            </TouchableOpacity>
-          ))
+                
+                {/* Action Buttons */}
+                <View style={styles.wishActions}>
+                  <TouchableOpacity 
+                    style={styles.wishActionBtn}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleCompleteWish(wish.wish_id);
+                    }}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#10B981" />
+                    <Text style={styles.wishActionTextGreen}>Complete</Text>
+                  </TouchableOpacity>
+                  <View style={styles.actionDivider} />
+                  <TouchableOpacity 
+                    style={styles.wishActionBtn}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleDeleteWish(wish.wish_id);
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    <Text style={styles.wishActionTextRed}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            ))}
+            
+            {hasMoreWishes && (
+              <TouchableOpacity 
+                style={styles.viewMoreButton}
+                onPress={() => router.push('/wishbox')}
+              >
+                <Text style={styles.viewMoreText}>View {activeWishes.length - 5} more wishes</Text>
+                <Ionicons name="arrow-forward" size={16} color="#6366F1" />
+              </TouchableOpacity>
+            )}
+          </View>
         )}
+        
+        {/* Swipe Hint */}
+        <View style={styles.swipeHint}>
+          <Ionicons name="swap-horizontal" size={16} color="#9CA3AF" />
+          <Text style={styles.swipeHintText}>Swipe left or right to switch tabs</Text>
+        </View>
+        
         <View style={{ height: 20 }} />
       </ScrollView>
     </SafeAreaView>
@@ -352,6 +455,11 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 12,
   },
+  sectionTitleInline: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
   seeAllText: {
     fontSize: 14,
     color: '#6366F1',
@@ -400,13 +508,19 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginTop: 4,
   },
+  wishesContainer: {
+    marginTop: 4,
+  },
   wishCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
     marginBottom: 12,
+    overflow: 'hidden',
+  },
+  wishCardMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
   },
   wishCardIcon: {
     width: 48,
@@ -445,5 +559,60 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#10B981',
     marginLeft: 12,
+  },
+  wishActions: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  wishActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  actionDivider: {
+    width: 1,
+    backgroundColor: '#F3F4F6',
+  },
+  wishActionTextGreen: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#10B981',
+    marginLeft: 6,
+  },
+  wishActionTextRed: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#EF4444',
+    marginLeft: 6,
+  },
+  viewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  viewMoreText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6366F1',
+    marginRight: 6,
+  },
+  swipeHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+    paddingVertical: 12,
+  },
+  swipeHintText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginLeft: 8,
   },
 });
