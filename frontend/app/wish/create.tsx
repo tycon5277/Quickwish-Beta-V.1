@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Platform, Image, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { useAuth } from '../_layout';
@@ -15,30 +16,119 @@ const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ||
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
                    'https://quickwish-2.preview.emergentagent.com';
 
+// Primary wish categories with examples and sub-categories
 const WISH_TYPES = [
-  { id: 'delivery', label: 'Delivery', icon: 'bicycle', desc: 'Get items delivered' },
-  { id: 'ride_request', label: 'Ride Request', icon: 'car', desc: 'Need a personal ride' },
-  { id: 'commercial_ride', label: 'Commercial Ride', icon: 'bus', desc: 'Taxi/cab services' },
-  { id: 'medicine_delivery', label: 'Medicine Delivery', icon: 'medkit', desc: 'Urgent medicine needs' },
-  { id: 'domestic_help', label: 'Domestic Help', icon: 'home', desc: 'Cooking, cleaning, laundry' },
-  { id: 'construction', label: 'Construction', icon: 'construct', desc: 'Building, repairs' },
-  { id: 'home_maintenance', label: 'Home Maintenance', icon: 'hammer', desc: 'Plumbing, electrical' },
-  { id: 'errands', label: 'Errands', icon: 'walk', desc: 'Run errands for you' },
-  { id: 'companionship', label: 'Companionship', icon: 'people', desc: 'Company, assistance' },
-  { id: 'others', label: 'Others', icon: 'ellipsis-horizontal', desc: 'Other requests' },
+  { 
+    id: 'delivery', 
+    label: 'Delivery', 
+    icon: 'bicycle', 
+    desc: 'Get items delivered',
+    example: 'Need groceries from local market',
+    subCategories: null
+  },
+  { 
+    id: 'ride_request', 
+    label: 'Ride Request', 
+    icon: 'car', 
+    desc: 'Private vehicle rides',
+    example: 'Need a ride to the airport',
+    subCategories: [
+      { id: 'bike', label: 'Bike', icon: 'bicycle' },
+      { id: 'car', label: 'Car', icon: 'car' }
+    ]
+  },
+  { 
+    id: 'commercial_ride', 
+    label: 'Commercial Ride', 
+    icon: 'bus', 
+    desc: 'Auto, taxi, transport',
+    example: 'Need an auto to railway station',
+    subCategories: [
+      { id: 'auto', label: 'Auto Rickshaw', icon: 'car-sport' },
+      { id: 'taxi_car', label: 'Taxi Car', icon: 'car' },
+      { id: 'mini_bus', label: 'Mini Bus', icon: 'bus' },
+      { id: 'goods_small', label: 'Goods Carrier (Small)', icon: 'cube' },
+      { id: 'goods_medium', label: 'Goods Carrier (Medium)', icon: 'cube-outline' },
+      { id: 'goods_large', label: 'Goods Carrier (Large)', icon: 'car' }
+    ]
+  },
+  { 
+    id: 'medicine_delivery', 
+    label: 'Medicine Delivery', 
+    icon: 'medkit', 
+    desc: 'Urgent medicine needs',
+    example: 'Need medicines from Apollo Pharmacy',
+    subCategories: null
+  },
+  { 
+    id: 'domestic_help', 
+    label: 'Domestic Help', 
+    icon: 'home', 
+    desc: 'Cooking, cleaning, laundry',
+    example: 'Need help with house cleaning',
+    subCategories: null
+  },
+  { 
+    id: 'construction', 
+    label: 'Construction', 
+    icon: 'construct', 
+    desc: 'Building, repairs',
+    example: 'Need help with wall painting',
+    subCategories: null
+  },
+  { 
+    id: 'home_maintenance', 
+    label: 'Home Maintenance', 
+    icon: 'hammer', 
+    desc: 'Plumbing, electrical',
+    example: 'Need plumber for tap repair',
+    subCategories: null
+  },
+  { 
+    id: 'errands', 
+    label: 'Errands', 
+    icon: 'walk', 
+    desc: 'Run errands for you',
+    example: 'Need someone to pay electricity bill',
+    subCategories: null
+  },
+  { 
+    id: 'companionship', 
+    label: 'Companionship', 
+    icon: 'people', 
+    desc: 'Company, assistance',
+    example: 'Looking for a chess partner',
+    subCategories: null
+  },
+  { 
+    id: 'others', 
+    label: 'Others', 
+    icon: 'ellipsis-horizontal', 
+    desc: 'Other requests',
+    example: 'Describe what you need help with',
+    subCategories: null
+  },
 ];
 
-const MAX_VOICE_DURATION = 10; // 10 seconds max per voice note
+const MAX_VOICE_DURATION = 10;
 
 interface VoiceNote {
   uri: string;
   duration: number;
 }
 
+interface SavedAddress {
+  id: string;
+  label: string;
+  address: string;
+  lat?: number;
+  lng?: number;
+}
+
 export default function CreateWishScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { sessionToken } = useAuth();
+  const { sessionToken, user } = useAuth();
   const { triggerWishesRefresh, userLocation } = useAppStore();
   
   const [step, setStep] = useState(1);
@@ -46,6 +136,7 @@ export default function CreateWishScreen() {
   
   // Form state
   const [wishType, setWishType] = useState(params.type as string || '');
+  const [subCategory, setSubCategory] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
@@ -59,7 +150,14 @@ export default function CreateWishScreen() {
   const [radius, setRadius] = useState(5);
   const [remuneration, setRemuneration] = useState('');
   const [isImmediate, setIsImmediate] = useState(true);
-  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [showAddressPicker, setShowAddressPicker] = useState(false);
+
+  // Date/Time picker state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [tempDate, setTempDate] = useState<Date>(new Date());
 
   // Audio recording state
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -69,12 +167,19 @@ export default function CreateWishScreen() {
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
 
+  // Get selected wish type details
+  const selectedType = WISH_TYPES.find(t => t.id === wishType);
+  const hasSubCategories = selectedType?.subCategories && selectedType.subCategories.length > 0;
+
   useEffect(() => {
     if (!location) {
       getCurrentLocation();
     }
+    // Load saved addresses
+    if (user?.addresses) {
+      setSavedAddresses(user.addresses);
+    }
     
-    // Cleanup on unmount
     return () => {
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
@@ -129,16 +234,13 @@ export default function CreateWishScreen() {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.7,
-        base64: true,
       });
 
       if (!result.canceled && result.assets[0]) {
-        const imageUri = result.assets[0].uri;
-        setAttachedImages([...attachedImages, imageUri]);
+        setAttachedImages([...attachedImages, result.assets[0].uri]);
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
     }
   };
 
@@ -157,12 +259,10 @@ export default function CreateWishScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
-        const imageUri = result.assets[0].uri;
-        setAttachedImages([...attachedImages, imageUri]);
+        setAttachedImages([...attachedImages, result.assets[0].uri]);
       }
     } catch (error) {
       console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo');
     }
   };
 
@@ -192,7 +292,6 @@ export default function CreateWishScreen() {
       setIsRecording(true);
       setRecordingDuration(0);
 
-      // Start timer
       recordingTimerRef.current = setInterval(() => {
         setRecordingDuration(prev => {
           if (prev >= MAX_VOICE_DURATION - 1) {
@@ -205,7 +304,6 @@ export default function CreateWishScreen() {
 
     } catch (error) {
       console.error('Error starting recording:', error);
-      Alert.alert('Error', 'Failed to start recording');
     }
   };
 
@@ -243,7 +341,6 @@ export default function CreateWishScreen() {
 
   const playVoiceNote = async (index: number) => {
     try {
-      // Stop any currently playing sound
       if (soundRef.current) {
         await soundRef.current.unloadAsync();
         soundRef.current = null;
@@ -281,6 +378,43 @@ export default function CreateWishScreen() {
     setVoiceNotes(voiceNotes.filter((_, i) => i !== index));
   };
 
+  // Date/Time picker handlers
+  const handleDateConfirm = (date: Date) => {
+    setTempDate(date);
+    setShowDatePicker(false);
+    setShowTimePicker(true);
+  };
+
+  const handleTimeConfirm = (time: Date) => {
+    const finalDate = new Date(tempDate);
+    finalDate.setHours(time.getHours());
+    finalDate.setMinutes(time.getMinutes());
+    setScheduledDate(finalDate);
+    setShowTimePicker(false);
+  };
+
+  const formatScheduledDate = (date: Date) => {
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    };
+    return date.toLocaleDateString('en-US', options);
+  };
+
+  const selectSavedAddress = (addr: SavedAddress) => {
+    setLocation({
+      lat: addr.lat || 0,
+      lng: addr.lng || 0,
+      address: addr.address,
+    });
+    setManualAddress(addr.address);
+    setShowAddressPicker(false);
+  };
+
   const handleSubmit = async () => {
     if (!wishType || !title || !remuneration) {
       Alert.alert('Missing Information', 'Please fill in all required fields');
@@ -291,24 +425,24 @@ export default function CreateWishScreen() {
     try {
       const wishData = {
         wish_type: wishType,
+        sub_category: subCategory || null,
         title,
         description,
         location: location || { lat: 0, lng: 0, address: manualAddress || 'Not specified' },
         radius_km: radius,
         remuneration: parseFloat(remuneration),
         is_immediate: isImmediate,
-        scheduled_time: isImmediate ? null : scheduledDate || null,
-        // Note: In production, images and voice notes would be uploaded to a storage service
-        // and URLs would be stored here
+        scheduled_time: isImmediate ? null : scheduledDate?.toISOString() || null,
         has_images: attachedImages.length > 0,
         has_voice_notes: voiceNotes.length > 0,
+        image_count: attachedImages.length,
+        voice_note_count: voiceNotes.length,
       };
 
       await axios.post(`${BACKEND_URL}/api/wishes`, wishData, {
         headers: { Authorization: `Bearer ${sessionToken}` }
       });
 
-      // Trigger refresh on home screen
       triggerWishesRefresh();
 
       Alert.alert(
@@ -326,51 +460,104 @@ export default function CreateWishScreen() {
 
   const handleSelectType = (typeId: string) => {
     setWishType(typeId);
-    // Auto-advance to step 2 after selection
+    setSubCategory(''); // Reset sub-category
+    const type = WISH_TYPES.find(t => t.id === typeId);
+    // If has sub-categories, stay on step 1 to show them
+    if (!type?.subCategories) {
+      setTimeout(() => setStep(2), 300);
+    }
+  };
+
+  const handleSelectSubCategory = (subId: string) => {
+    setSubCategory(subId);
     setTimeout(() => setStep(2), 300);
+  };
+
+  // Get placeholder text based on wish type
+  const getTitlePlaceholder = () => {
+    return selectedType?.example || 'Describe what you need';
   };
 
   const renderStep1 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>What type of help do you need?</Text>
-      <Text style={styles.stepSubtitle}>Select a category for your wish</Text>
+      <Text style={styles.stepTitle}>Primary Wish Category</Text>
+      <Text style={styles.stepSubtitle}>Select what type of help you need</Text>
       
-      <View style={styles.typeGrid}>
-        {WISH_TYPES.map((type) => (
-          <TouchableOpacity
-            key={type.id}
-            style={[
-              styles.typeCard,
-              wishType === type.id && styles.typeCardSelected
-            ]}
-            onPress={() => handleSelectType(type.id)}
+      {/* Show sub-categories if a type with sub-categories is selected */}
+      {wishType && hasSubCategories && !subCategory ? (
+        <View>
+          <TouchableOpacity 
+            style={styles.backToCategories}
+            onPress={() => setWishType('')}
           >
-            <View style={[
-              styles.typeIconContainer,
-              wishType === type.id && styles.typeIconContainerSelected
-            ]}>
-              <Ionicons
-                name={type.icon as any}
-                size={26}
-                color={wishType === type.id ? '#fff' : '#6366F1'}
-              />
-            </View>
-            <Text style={[
-              styles.typeLabel,
-              wishType === type.id && styles.typeLabelSelected
-            ]}>
-              {type.label}
-            </Text>
-            <Text style={styles.typeDesc} numberOfLines={1}>{type.desc}</Text>
+            <Ionicons name="arrow-back" size={18} color="#6366F1" />
+            <Text style={styles.backToCategoriesText}>Back to categories</Text>
           </TouchableOpacity>
-        ))}
-      </View>
+          
+          <Text style={styles.subCategoryTitle}>Select {selectedType?.label} Type</Text>
+          <View style={styles.subCategoryGrid}>
+            {selectedType?.subCategories?.map((sub) => (
+              <TouchableOpacity
+                key={sub.id}
+                style={[
+                  styles.subCategoryCard,
+                  subCategory === sub.id && styles.subCategoryCardSelected
+                ]}
+                onPress={() => handleSelectSubCategory(sub.id)}
+              >
+                <Ionicons
+                  name={sub.icon as any}
+                  size={28}
+                  color={subCategory === sub.id ? '#fff' : '#6366F1'}
+                />
+                <Text style={[
+                  styles.subCategoryLabel,
+                  subCategory === sub.id && styles.subCategoryLabelSelected
+                ]}>
+                  {sub.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.typeGrid}>
+          {WISH_TYPES.map((type) => (
+            <TouchableOpacity
+              key={type.id}
+              style={[
+                styles.typeCard,
+                wishType === type.id && styles.typeCardSelected
+              ]}
+              onPress={() => handleSelectType(type.id)}
+            >
+              <View style={[
+                styles.typeIconContainer,
+                wishType === type.id && styles.typeIconContainerSelected
+              ]}>
+                <Ionicons
+                  name={type.icon as any}
+                  size={24}
+                  color={wishType === type.id ? '#fff' : '#6366F1'}
+                />
+              </View>
+              <Text style={[
+                styles.typeLabel,
+                wishType === type.id && styles.typeLabelSelected
+              ]}>
+                {type.label}
+              </Text>
+              <Text style={styles.typeDesc} numberOfLines={1}>{type.desc}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
 
   const renderStep2 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Describe your wish</Text>
+      <Text style={styles.stepTitle}>Describe Your Wish</Text>
       <Text style={styles.stepSubtitle}>Provide details about what you need</Text>
       
       {/* Title Input */}
@@ -378,7 +565,7 @@ export default function CreateWishScreen() {
         <Text style={styles.inputLabel}>Title *</Text>
         <TextInput
           style={styles.textInput}
-          placeholder="e.g., Need groceries from market"
+          placeholder={getTitlePlaceholder()}
           placeholderTextColor="#9CA3AF"
           value={title}
           onChangeText={setTitle}
@@ -402,12 +589,12 @@ export default function CreateWishScreen() {
         {/* Attachment Options */}
         <View style={styles.attachmentBar}>
           <TouchableOpacity style={styles.attachmentButton} onPress={pickImage}>
-            <Ionicons name="image-outline" size={22} color="#6366F1" />
+            <Ionicons name="image-outline" size={20} color="#6366F1" />
             <Text style={styles.attachmentButtonText}>Gallery</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.attachmentButton} onPress={takePhoto}>
-            <Ionicons name="camera-outline" size={22} color="#6366F1" />
+            <Ionicons name="camera-outline" size={20} color="#6366F1" />
             <Text style={styles.attachmentButtonText}>Camera</Text>
           </TouchableOpacity>
           
@@ -417,7 +604,7 @@ export default function CreateWishScreen() {
           >
             <Ionicons 
               name={isRecording ? "stop-circle" : "mic-outline"} 
-              size={22} 
+              size={20} 
               color={isRecording ? "#EF4444" : "#6366F1"} 
             />
             <Text style={[styles.attachmentButtonText, isRecording && styles.recordingText]}>
@@ -434,12 +621,7 @@ export default function CreateWishScreen() {
               <Text style={styles.recordingLabel}>Recording... ({MAX_VOICE_DURATION - recordingDuration}s left)</Text>
             </View>
             <View style={styles.recordingProgressBar}>
-              <View 
-                style={[
-                  styles.recordingProgressFill, 
-                  { width: `${(recordingDuration / MAX_VOICE_DURATION) * 100}%` }
-                ]} 
-              />
+              <View style={[styles.recordingProgressFill, { width: `${(recordingDuration / MAX_VOICE_DURATION) * 100}%` }]} />
             </View>
           </View>
         )}
@@ -453,10 +635,7 @@ export default function CreateWishScreen() {
             {attachedImages.map((uri, index) => (
               <View key={index} style={styles.imageContainer}>
                 <Image source={{ uri }} style={styles.attachedImage} />
-                <TouchableOpacity 
-                  style={styles.removeImageButton}
-                  onPress={() => removeImage(index)}
-                >
+                <TouchableOpacity style={styles.removeImageButton} onPress={() => removeImage(index)}>
                   <Ionicons name="close-circle" size={24} color="#EF4444" />
                 </TouchableOpacity>
               </View>
@@ -471,25 +650,15 @@ export default function CreateWishScreen() {
           <Text style={styles.inputLabel}>Voice Notes ({voiceNotes.length})</Text>
           {voiceNotes.map((note, index) => (
             <View key={index} style={styles.voiceNoteItem}>
-              <TouchableOpacity 
-                style={styles.voiceNotePlayButton}
-                onPress={() => playVoiceNote(index)}
-              >
-                <Ionicons 
-                  name={playingIndex === index ? "pause" : "play"} 
-                  size={20} 
-                  color="#fff" 
-                />
+              <TouchableOpacity style={styles.voiceNotePlayButton} onPress={() => playVoiceNote(index)}>
+                <Ionicons name={playingIndex === index ? "pause" : "play"} size={18} color="#fff" />
               </TouchableOpacity>
               <View style={styles.voiceNoteInfo}>
                 <Text style={styles.voiceNoteName}>Voice Note {index + 1}</Text>
                 <Text style={styles.voiceNoteDuration}>{note.duration}s</Text>
               </View>
-              <TouchableOpacity 
-                style={styles.voiceNoteRemoveButton}
-                onPress={() => removeVoiceNote(index)}
-              >
-                <Ionicons name="trash-outline" size={20} color="#EF4444" />
+              <TouchableOpacity style={styles.voiceNoteRemoveButton} onPress={() => removeVoiceNote(index)}>
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
               </TouchableOpacity>
             </View>
           ))}
@@ -500,27 +669,79 @@ export default function CreateWishScreen() {
 
   const renderStep3 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Location & Radius</Text>
+      <Text style={styles.stepTitle}>Location & Visibility</Text>
       <Text style={styles.stepSubtitle}>Set where you need help</Text>
       
+      {/* Current Location with Mini Map */}
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>Your Location</Text>
-        <View style={styles.locationDisplay}>
-          <Ionicons name="location" size={20} color="#6366F1" />
-          <Text style={styles.locationText} numberOfLines={2}>
-            {location?.address || manualAddress || 'Location not set'}
-          </Text>
-          <TouchableOpacity onPress={getCurrentLocation}>
-            <Ionicons name="refresh" size={20} color="#6366F1" />
+        <TouchableOpacity 
+          style={styles.locationMapContainer}
+          onPress={() => router.push('/location-picker')}
+        >
+          <View style={styles.miniMapPlaceholder}>
+            <Ionicons name="map" size={40} color="#6366F1" />
+            <View style={styles.mapPin}>
+              <Ionicons name="location" size={24} color="#EF4444" />
+            </View>
+          </View>
+          <View style={styles.locationDetails}>
+            <Text style={styles.locationText} numberOfLines={2}>
+              {location?.address || manualAddress || 'Tap to set location'}
+            </Text>
+            <Text style={styles.locationHint}>Tap to fine-tune with map</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Saved Addresses */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.inputLabel}>Or Select Saved Address</Text>
+        {savedAddresses.length > 0 ? (
+          <View style={styles.savedAddressList}>
+            {savedAddresses.slice(0, 3).map((addr) => (
+              <TouchableOpacity
+                key={addr.id}
+                style={[
+                  styles.savedAddressItem,
+                  location?.address === addr.address && styles.savedAddressItemSelected
+                ]}
+                onPress={() => selectSavedAddress(addr)}
+              >
+                <Ionicons 
+                  name={addr.label.toLowerCase() === 'home' ? 'home' : addr.label.toLowerCase() === 'office' ? 'business' : 'location'} 
+                  size={18} 
+                  color={location?.address === addr.address ? '#fff' : '#6366F1'} 
+                />
+                <View style={styles.savedAddressInfo}>
+                  <Text style={[styles.savedAddressLabel, location?.address === addr.address && styles.savedAddressLabelSelected]}>
+                    {addr.label}
+                  </Text>
+                  <Text style={[styles.savedAddressText, location?.address === addr.address && styles.savedAddressTextSelected]} numberOfLines={1}>
+                    {addr.address}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <TouchableOpacity 
+            style={styles.addAddressButton}
+            onPress={() => router.push('/account/addresses')}
+          >
+            <Ionicons name="add-circle-outline" size={20} color="#6366F1" />
+            <Text style={styles.addAddressText}>Add a saved address</Text>
           </TouchableOpacity>
-        </View>
+        )}
       </View>
       
+      {/* Manual Address Entry */}
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Or Enter Address Manually</Text>
+        <Text style={styles.inputLabel}>Or Enter Manually</Text>
         <TextInput
           style={styles.textInput}
-          placeholder="Enter your address"
+          placeholder="Type full address..."
           placeholderTextColor="#9CA3AF"
           value={manualAddress}
           onChangeText={(text) => {
@@ -532,8 +753,17 @@ export default function CreateWishScreen() {
         />
       </View>
       
+      {/* Visibility Radius */}
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Search Radius: {radius} km</Text>
+        <View style={styles.radiusHeader}>
+          <Text style={styles.inputLabel}>Visibility Radius</Text>
+          <TouchableOpacity style={styles.infoButton}>
+            <Ionicons name="information-circle-outline" size={18} color="#6366F1" />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.radiusExplainer}>
+          Fulfillment agents within {radius} km of your location will see this wish
+        </Text>
         <View style={styles.radiusContainer}>
           <TouchableOpacity
             style={styles.radiusButton}
@@ -552,16 +782,23 @@ export default function CreateWishScreen() {
             <Ionicons name="add" size={24} color="#6366F1" />
           </TouchableOpacity>
         </View>
-        <Text style={styles.radiusHint}>Helpers within this radius will see your wish</Text>
+        <View style={styles.radiusScale}>
+          <Text style={styles.radiusScaleText}>1 km</Text>
+          <View style={styles.radiusSliderTrack}>
+            <View style={[styles.radiusSliderFill, { width: `${((radius - 1) / 49) * 100}%` }]} />
+          </View>
+          <Text style={styles.radiusScaleText}>50 km</Text>
+        </View>
       </View>
     </View>
   );
 
   const renderStep4 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Remuneration & Timing</Text>
-      <Text style={styles.stepSubtitle}>Set your offer and when you need help</Text>
+      <Text style={styles.stepTitle}>Payment & Timing</Text>
+      <Text style={styles.stepSubtitle}>Set your offer and schedule</Text>
       
+      {/* Remuneration */}
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>Your Offer *</Text>
         <View style={styles.remunerationInput}>
@@ -578,55 +815,59 @@ export default function CreateWishScreen() {
         <Text style={styles.inputHint}>Fair compensation encourages quick responses</Text>
       </View>
       
+      {/* Timing Options */}
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>When do you need help?</Text>
         <View style={styles.timingOptions}>
           <TouchableOpacity
             style={[styles.timingOption, isImmediate && styles.timingOptionSelected]}
-            onPress={() => setIsImmediate(true)}
+            onPress={() => {
+              setIsImmediate(true);
+              setScheduledDate(null);
+            }}
           >
-            <Ionicons
-              name="flash"
-              size={24}
-              color={isImmediate ? '#fff' : '#F59E0B'}
-            />
-            <Text style={[styles.timingLabel, isImmediate && styles.timingLabelSelected]}>
-              Immediately
-            </Text>
-            <Text style={[styles.timingDesc, isImmediate && styles.timingDescSelected]}>
-              Need help now
-            </Text>
+            <Ionicons name="flash" size={24} color={isImmediate ? '#fff' : '#F59E0B'} />
+            <Text style={[styles.timingLabel, isImmediate && styles.timingLabelSelected]}>Now</Text>
+            <Text style={[styles.timingDesc, isImmediate && styles.timingDescSelected]}>Need help ASAP</Text>
           </TouchableOpacity>
           
           <TouchableOpacity
             style={[styles.timingOption, !isImmediate && styles.timingOptionSelected]}
             onPress={() => setIsImmediate(false)}
           >
-            <Ionicons
-              name="calendar"
-              size={24}
-              color={!isImmediate ? '#fff' : '#6366F1'}
-            />
-            <Text style={[styles.timingLabel, !isImmediate && styles.timingLabelSelected]}>
-              Schedule
-            </Text>
-            <Text style={[styles.timingDesc, !isImmediate && styles.timingDescSelected]}>
-              For later
-            </Text>
+            <Ionicons name="calendar" size={24} color={!isImmediate ? '#fff' : '#6366F1'} />
+            <Text style={[styles.timingLabel, !isImmediate && styles.timingLabelSelected]}>Schedule</Text>
+            <Text style={[styles.timingDesc, !isImmediate && styles.timingDescSelected]}>Pick date & time</Text>
           </TouchableOpacity>
         </View>
       </View>
       
+      {/* Schedule Picker */}
       {!isImmediate && (
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Scheduled Date & Time</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="e.g., Tomorrow at 10 AM"
-            placeholderTextColor="#9CA3AF"
-            value={scheduledDate}
-            onChangeText={setScheduledDate}
-          />
+          <Text style={styles.inputLabel}>Select Date & Time</Text>
+          <TouchableOpacity 
+            style={styles.schedulePicker}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <View style={styles.scheduleIconContainer}>
+              <Ionicons name="calendar-outline" size={24} color="#6366F1" />
+            </View>
+            <View style={styles.scheduleInfo}>
+              {scheduledDate ? (
+                <>
+                  <Text style={styles.scheduleDate}>{formatScheduledDate(scheduledDate)}</Text>
+                  <Text style={styles.scheduleTap}>Tap to change</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.schedulePrompt}>Tap to select date & time</Text>
+                  <Text style={styles.scheduleTap}>Calendar will open</Text>
+                </>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -634,14 +875,18 @@ export default function CreateWishScreen() {
       <View style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>Wish Summary</Text>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Type:</Text>
+          <Text style={styles.summaryLabel}>Category:</Text>
           <Text style={styles.summaryValue}>
-            {WISH_TYPES.find(t => t.id === wishType)?.label || '-'}
+            {selectedType?.label}{subCategory ? ` (${selectedType?.subCategories?.find(s => s.id === subCategory)?.label})` : ''}
           </Text>
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Title:</Text>
           <Text style={styles.summaryValue} numberOfLines={1}>{title || '-'}</Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Visibility:</Text>
+          <Text style={styles.summaryValue}>{radius} km radius</Text>
         </View>
         {attachedImages.length > 0 && (
           <View style={styles.summaryRow}>
@@ -651,13 +896,39 @@ export default function CreateWishScreen() {
         )}
         {voiceNotes.length > 0 && (
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Voice Notes:</Text>
-            <Text style={styles.summaryValue}>{voiceNotes.length} recorded</Text>
+            <Text style={styles.summaryLabel}>Voice:</Text>
+            <Text style={styles.summaryValue}>{voiceNotes.length} note(s)</Text>
           </View>
         )}
       </View>
+
+      {/* Date Picker Modal */}
+      <DateTimePickerModal
+        isVisible={showDatePicker}
+        mode="date"
+        onConfirm={handleDateConfirm}
+        onCancel={() => setShowDatePicker(false)}
+        minimumDate={new Date()}
+      />
+
+      {/* Time Picker Modal */}
+      <DateTimePickerModal
+        isVisible={showTimePicker}
+        mode="time"
+        onConfirm={handleTimeConfirm}
+        onCancel={() => setShowTimePicker(false)}
+      />
     </View>
   );
+
+  const canProceed = () => {
+    if (step === 1) {
+      if (hasSubCategories && !subCategory) return false;
+      return !!wishType;
+    }
+    if (step === 2) return !!title;
+    return true;
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -687,10 +958,7 @@ export default function CreateWishScreen() {
       {/* Footer */}
       <View style={styles.footer}>
         {step > 1 && (
-          <TouchableOpacity
-            style={styles.backStepButton}
-            onPress={() => setStep(step - 1)}
-          >
+          <TouchableOpacity style={styles.backStepButton} onPress={() => setStep(step - 1)}>
             <Ionicons name="arrow-back" size={20} color="#6B7280" />
             <Text style={styles.backStepText}>Back</Text>
           </TouchableOpacity>
@@ -698,23 +966,16 @@ export default function CreateWishScreen() {
         
         {step < 4 ? (
           <TouchableOpacity
-            style={[
-              styles.nextButton,
-              (step === 1 && !wishType) && styles.nextButtonDisabled,
-              (step === 2 && !title) && styles.nextButtonDisabled
-            ]}
+            style={[styles.nextButton, !canProceed() && styles.nextButtonDisabled]}
             onPress={() => setStep(step + 1)}
-            disabled={(step === 1 && !wishType) || (step === 2 && !title)}
+            disabled={!canProceed()}
           >
             <Text style={styles.nextButtonText}>Continue</Text>
             <Ionicons name="arrow-forward" size={20} color="#fff" />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[
-              styles.submitButton,
-              (!title || !remuneration) && styles.submitButtonDisabled
-            ]}
+            style={[styles.submitButton, (!title || !remuneration) && styles.submitButtonDisabled]}
             onPress={handleSubmit}
             disabled={isLoading || !title || !remuneration}
           >
@@ -734,10 +995,7 @@ export default function CreateWishScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -746,255 +1004,253 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
-  closeButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    textAlign: 'center',
-  },
-  stepIndicator: {
-    width: 44,
-    alignItems: 'center',
-  },
-  stepText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: '#E5E7EB',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#6366F1',
-  },
-  content: {
-    flex: 1,
-  },
-  stepContent: {
-    padding: 20,
-  },
-  stepTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  stepSubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 24,
-  },
-  typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
+  closeButton: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { flex: 1, fontSize: 18, fontWeight: '600', color: '#1F2937', textAlign: 'center' },
+  stepIndicator: { width: 44, alignItems: 'center' },
+  stepText: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
+  progressBar: { height: 4, backgroundColor: '#E5E7EB' },
+  progressFill: { height: '100%', backgroundColor: '#6366F1' },
+  content: { flex: 1 },
+  stepContent: { padding: 20 },
+  stepTitle: { fontSize: 22, fontWeight: '700', color: '#1F2937', marginBottom: 6 },
+  stepSubtitle: { fontSize: 15, color: '#6B7280', marginBottom: 20 },
+  
+  // Type grid
+  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   typeCard: {
     width: '48%',
     backgroundColor: '#F9FAFB',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  typeCardSelected: {
-    borderColor: '#6366F1',
-    backgroundColor: '#EEF2FF',
-  },
+  typeCardSelected: { borderColor: '#6366F1', backgroundColor: '#EEF2FF' },
   typeIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  typeIconContainerSelected: {
-    backgroundColor: '#6366F1',
-  },
-  typeLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 2,
-  },
-  typeLabelSelected: {
-    color: '#6366F1',
-  },
-  typeDesc: {
-    fontSize: 11,
-    color: '#9CA3AF',
-  },
-  inputGroup: {
-    marginBottom: 24,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
     marginBottom: 8,
   },
-  textInput: {
+  typeIconContainerSelected: { backgroundColor: '#6366F1' },
+  typeLabel: { fontSize: 13, fontWeight: '600', color: '#1F2937', marginBottom: 2 },
+  typeLabelSelected: { color: '#6366F1' },
+  typeDesc: { fontSize: 11, color: '#9CA3AF' },
+  
+  // Sub-categories
+  backToCategories: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  backToCategoriesText: { fontSize: 14, color: '#6366F1', marginLeft: 6 },
+  subCategoryTitle: { fontSize: 16, fontWeight: '600', color: '#374151', marginBottom: 12 },
+  subCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  subCategoryCard: {
+    width: '48%',
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
+    padding: 16,
+    marginBottom: 10,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  subCategoryCardSelected: { borderColor: '#6366F1', backgroundColor: '#6366F1' },
+  subCategoryLabel: { fontSize: 13, fontWeight: '500', color: '#374151', marginTop: 8, textAlign: 'center' },
+  subCategoryLabelSelected: { color: '#fff' },
+  
+  // Inputs
+  inputGroup: { marginBottom: 20 },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  textInput: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
     color: '#1F2937',
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  textArea: {
-    height: 100,
-    paddingTop: 14,
-  },
-  // Attachment styles
+  textArea: { height: 90, paddingTop: 12 },
+  
+  // Attachments
   attachmentBar: {
     flexDirection: 'row',
-    marginTop: 12,
+    marginTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
-    paddingTop: 12,
+    paddingTop: 10,
   },
   attachmentButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EEF2FF',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  attachmentButtonRecording: {
-    backgroundColor: '#FEE2E2',
-  },
-  attachmentButtonText: {
-    fontSize: 13,
-    color: '#6366F1',
-    marginLeft: 6,
-    fontWeight: '500',
-  },
-  recordingText: {
-    color: '#EF4444',
-  },
-  recordingProgress: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 10,
-  },
-  recordingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  recordingDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#EF4444',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
     marginRight: 8,
   },
-  recordingLabel: {
-    fontSize: 13,
-    color: '#EF4444',
-    fontWeight: '500',
-  },
-  recordingProgressBar: {
-    height: 4,
-    backgroundColor: '#FECACA',
-    borderRadius: 2,
-  },
-  recordingProgressFill: {
-    height: '100%',
-    backgroundColor: '#EF4444',
-    borderRadius: 2,
-  },
-  // Images styles
-  imagesScroll: {
-    marginTop: 8,
-  },
-  imageContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  attachedImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-  },
-  // Voice notes styles
+  attachmentButtonRecording: { backgroundColor: '#FEE2E2' },
+  attachmentButtonText: { fontSize: 12, color: '#6366F1', marginLeft: 4, fontWeight: '500' },
+  recordingText: { color: '#EF4444' },
+  recordingProgress: { marginTop: 10, padding: 10, backgroundColor: '#FEF2F2', borderRadius: 8 },
+  recordingIndicator: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  recordingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', marginRight: 6 },
+  recordingLabel: { fontSize: 12, color: '#EF4444', fontWeight: '500' },
+  recordingProgressBar: { height: 3, backgroundColor: '#FECACA', borderRadius: 2 },
+  recordingProgressFill: { height: '100%', backgroundColor: '#EF4444', borderRadius: 2 },
+  
+  // Images
+  imagesScroll: { marginTop: 6 },
+  imageContainer: { position: 'relative', marginRight: 10 },
+  attachedImage: { width: 80, height: 80, borderRadius: 8 },
+  removeImageButton: { position: 'absolute', top: -6, right: -6, backgroundColor: '#fff', borderRadius: 12 },
+  
+  // Voice notes
   voiceNoteItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 8,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
   },
   voiceNotePlayButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#6366F1',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  voiceNoteInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  voiceNoteName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1F2937',
-  },
-  voiceNoteDuration: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  voiceNoteRemoveButton: {
-    padding: 8,
-  },
-  locationDisplay: {
+  voiceNoteInfo: { flex: 1, marginLeft: 10 },
+  voiceNoteName: { fontSize: 13, fontWeight: '500', color: '#1F2937' },
+  voiceNoteDuration: { fontSize: 11, color: '#6B7280', marginTop: 2 },
+  voiceNoteRemoveButton: { padding: 6 },
+  
+  // Location
+  locationMapContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#F9FAFB',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  locationText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#374151',
-    marginLeft: 12,
+  miniMapPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
   },
-  radiusContainer: {
+  mapPin: { position: 'absolute', top: 8 },
+  locationDetails: { flex: 1, marginLeft: 12 },
+  locationText: { fontSize: 14, color: '#1F2937', fontWeight: '500' },
+  locationHint: { fontSize: 11, color: '#6366F1', marginTop: 4 },
+  
+  // Saved addresses
+  savedAddressList: { marginTop: 4 },
+  savedAddressItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  savedAddressItemSelected: { backgroundColor: '#6366F1', borderColor: '#6366F1' },
+  savedAddressInfo: { flex: 1, marginLeft: 10 },
+  savedAddressLabel: { fontSize: 13, fontWeight: '600', color: '#1F2937' },
+  savedAddressLabelSelected: { color: '#fff' },
+  savedAddressText: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  savedAddressTextSelected: { color: 'rgba(255,255,255,0.8)' },
+  addAddressButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#6366F1',
+    borderStyle: 'dashed',
   },
+  addAddressText: { fontSize: 14, color: '#6366F1', marginLeft: 6 },
+  
+  // Radius
+  radiusHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  infoButton: { marginLeft: 6 },
+  radiusExplainer: { fontSize: 12, color: '#6B7280', marginBottom: 12, lineHeight: 18 },
+  radiusContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   radiusButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radiusDisplay: { flexDirection: 'row', alignItems: 'baseline', marginHorizontal: 20 },
+  radiusValue: { fontSize: 32, fontWeight: '700', color: '#6366F1' },
+  radiusUnit: { fontSize: 16, color: '#6B7280', marginLeft: 4 },
+  radiusScale: { flexDirection: 'row', alignItems: 'center' },
+  radiusScaleText: { fontSize: 11, color: '#9CA3AF', width: 40 },
+  radiusSliderTrack: { flex: 1, height: 4, backgroundColor: '#E5E7EB', borderRadius: 2, marginHorizontal: 8 },
+  radiusSliderFill: { height: '100%', backgroundColor: '#6366F1', borderRadius: 2 },
+  
+  // Remuneration
+  remunerationInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  currencySymbol: { fontSize: 22, fontWeight: '600', color: '#10B981' },
+  remunerationTextInput: { flex: 1, fontSize: 22, fontWeight: '600', color: '#1F2937', paddingVertical: 12, marginLeft: 6 },
+  inputHint: { fontSize: 11, color: '#9CA3AF', marginTop: 6 },
+  
+  // Timing
+  timingOptions: { flexDirection: 'row', justifyContent: 'space-between' },
+  timingOption: {
+    width: '48%',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  timingOptionSelected: { backgroundColor: '#6366F1', borderColor: '#6366F1' },
+  timingLabel: { fontSize: 15, fontWeight: '600', color: '#1F2937', marginTop: 8 },
+  timingLabelSelected: { color: '#fff' },
+  timingDesc: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+  timingDescSelected: { color: 'rgba(255,255,255,0.8)' },
+  
+  // Schedule picker
+  schedulePicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  scheduleIconContainer: {
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -1002,172 +1258,58 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  radiusDisplay: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginHorizontal: 24,
-  },
-  radiusValue: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#6366F1',
-  },
-  radiusUnit: {
-    fontSize: 18,
-    color: '#6B7280',
-    marginLeft: 4,
-  },
-  radiusHint: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    marginTop: 12,
-  },
-  remunerationInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  currencySymbol: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#10B981',
-  },
-  remunerationTextInput: {
-    flex: 1,
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1F2937',
-    paddingVertical: 14,
-    marginLeft: 8,
-  },
-  inputHint: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 8,
-  },
-  timingOptions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  timingOption: {
-    width: '48%',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  timingOptionSelected: {
-    backgroundColor: '#6366F1',
-    borderColor: '#6366F1',
-  },
-  timingLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginTop: 12,
-  },
-  timingLabelSelected: {
-    color: '#fff',
-  },
-  timingDesc: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    marginTop: 4,
-  },
-  timingDescSelected: {
-    color: 'rgba(255,255,255,0.8)',
-  },
-  // Summary card
+  scheduleInfo: { flex: 1, marginLeft: 12 },
+  scheduleDate: { fontSize: 15, fontWeight: '600', color: '#1F2937' },
+  schedulePrompt: { fontSize: 14, color: '#6B7280' },
+  scheduleTap: { fontSize: 11, color: '#6366F1', marginTop: 2 },
+  
+  // Summary
   summaryCard: {
     backgroundColor: '#F0FDF4',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 12,
+    padding: 14,
     marginTop: 8,
     borderWidth: 1,
     borderColor: '#BBF7D0',
   },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#166534',
-    marginBottom: 12,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#15803D',
-    width: 100,
-  },
-  summaryValue: {
-    flex: 1,
-    fontSize: 14,
-    color: '#166534',
-    fontWeight: '500',
-  },
+  summaryTitle: { fontSize: 14, fontWeight: '600', color: '#166534', marginBottom: 10 },
+  summaryRow: { flexDirection: 'row', marginBottom: 6 },
+  summaryLabel: { fontSize: 13, color: '#15803D', width: 80 },
+  summaryValue: { flex: 1, fontSize: 13, color: '#166534', fontWeight: '500' },
+  
+  // Footer
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
     backgroundColor: '#fff',
   },
-  backStepButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-  },
-  backStepText: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginLeft: 8,
-  },
+  backStepButton: { flexDirection: 'row', alignItems: 'center', padding: 10 },
+  backStepText: { fontSize: 15, color: '#6B7280', marginLeft: 6 },
   nextButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#6366F1',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
     marginLeft: 'auto',
   },
-  nextButtonDisabled: {
-    backgroundColor: '#D1D5DB',
-  },
-  nextButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-    marginRight: 8,
-  },
+  nextButtonDisabled: { backgroundColor: '#D1D5DB' },
+  nextButtonText: { fontSize: 15, fontWeight: '600', color: '#fff', marginRight: 6 },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#10B981',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
     marginLeft: 'auto',
   },
-  submitButtonDisabled: {
-    backgroundColor: '#D1D5DB',
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-    marginLeft: 8,
-  },
+  submitButtonDisabled: { backgroundColor: '#D1D5DB' },
+  submitButtonText: { fontSize: 15, fontWeight: '600', color: '#fff', marginLeft: 6 },
 });
