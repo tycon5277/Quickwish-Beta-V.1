@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { useAppStore } from '../store';
+import { useAppStore } from '../../src/store';
 
 export default function PermissionsScreen() {
   const router = useRouter();
