@@ -73,12 +73,14 @@ export default function WishboxScreen() {
     switch (type) {
       case 'delivery': return 'bicycle';
       case 'ride_request': return 'car';
+      case 'commercial_ride': return 'bus';
       case 'medicine_delivery': return 'medkit';
-      case 'household_chores': return 'home';
-      case 'errands': return 'walk';
-      case 'domestic_help': return 'hand-left';
+      case 'domestic_help': return 'home';
       case 'construction': return 'construct';
+      case 'home_maintenance': return 'hammer';
+      case 'errands': return 'walk';
       case 'companionship': return 'people';
+      case 'others': return 'ellipsis-horizontal';
       default: return 'help-circle';
     }
   };
