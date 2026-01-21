@@ -214,6 +214,7 @@ export default function RootLayout() {
         <Stack.Screen name="chat" />
         <Stack.Screen name="wish" />
         <Stack.Screen name="account" />
+        <Stack.Screen name="location-picker" options={{ presentation: 'modal' }} />
       </Stack>
     </AuthProvider>
   );
