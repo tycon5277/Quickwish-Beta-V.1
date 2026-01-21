@@ -503,14 +503,19 @@ class ComprehensiveAPITester:
             # Test auth APIs
             self.test_auth_apis()
             
-            # Test wish APIs (comprehensive)
-            self.test_wish_apis()
-            
-            # Test chat APIs
-            self.test_chat_apis()
-            
-            # Test user APIs
-            self.test_user_apis()
+            # Create a new session for protected endpoint testing (since logout invalidated the previous one)
+            print("\n=== Creating New Session for Protected Endpoint Testing ===")
+            if self.setup_test_user_session():
+                # Test wish APIs (comprehensive)
+                self.test_wish_apis()
+                
+                # Test chat APIs
+                self.test_chat_apis()
+                
+                # Test user APIs
+                self.test_user_apis()
+            else:
+                print("❌ Could not create new session for protected endpoint testing")
         
         # Print comprehensive summary
         self.print_comprehensive_summary()
