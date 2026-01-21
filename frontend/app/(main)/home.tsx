@@ -25,11 +25,26 @@ interface Wish {
 export default function HomeScreen() {
   const router = useRouter();
   const { user, sessionToken } = useAuth();
-  const { wishesRefreshTrigger, setUserLocation, locationPermissionChecked, setLocationPermissionChecked, triggerWishesRefresh } = useAppStore();
+  const { 
+    wishesRefreshTrigger, 
+    setUserLocation, 
+    locationPermissionChecked, 
+    setLocationPermissionChecked, 
+    triggerWishesRefresh,
+    isReturningUser,
+    checkAndSetReturningUser
+  } = useAppStore();
   const [location, setLocation] = useState<string>('Fetching location...');
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Check if returning user on mount
+  useEffect(() => {
+    if (user?.email) {
+      checkAndSetReturningUser(user.email);
+    }
+  }, [user?.email]);
 
   const fetchLocation = useCallback(async () => {
     try {
