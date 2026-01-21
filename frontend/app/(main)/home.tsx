@@ -204,12 +204,16 @@ export default function HomeScreen() {
   const { userLocation } = useAppStore();
   const displayLocation = userLocation?.address || location;
 
+  // Get greeting based on returning user status
+  const userName = user?.name?.split(' ')[0] || 'User';
+  const greeting = isReturningUser ? `Welcome back, ${userName}` : `Welcome, ${userName}`;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'User'}</Text>
+          <Text style={styles.greeting}>{greeting}</Text>
           <TouchableOpacity style={styles.locationRow} onPress={() => router.push('/location-picker')}>
             <Ionicons name="location" size={14} color="#6366F1" />
             <Text style={styles.locationText} numberOfLines={1}>{displayLocation}</Text>
@@ -220,7 +224,7 @@ export default function HomeScreen() {
           style={styles.wishboxButton}
           onPress={() => router.push('/wishbox')}
         >
-          <Ionicons name="gift" size={24} color="#6366F1" />
+          <Ionicons name="layers" size={24} color="#6366F1" />
           {activeWishes.length > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{activeWishes.length}</Text>
