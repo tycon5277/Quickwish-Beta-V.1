@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Image } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Location from 'expo-location';
+import { Audio } from 'expo-av';
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { useAuth } from '../_layout';
@@ -16,17 +16,25 @@ const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ||
 const WISH_TYPES = [
   { id: 'delivery', label: 'Delivery', icon: 'bicycle' },
   { id: 'ride_request', label: 'Ride Request', icon: 'car' },
-  { id: 'medicine_delivery', label: 'Medicine', icon: 'medkit' },
-  { id: 'household_chores', label: 'Household', icon: 'home' },
-  { id: 'errands', label: 'Errands', icon: 'walk' },
-  { id: 'domestic_help', label: 'Domestic Help', icon: 'hand-left' },
+  { id: 'commercial_ride', label: 'Commercial Ride', icon: 'bus' },
+  { id: 'medicine_delivery', label: 'Medicine Delivery', icon: 'medkit' },
+  { id: 'domestic_help', label: 'Domestic Help', icon: 'home' },
   { id: 'construction', label: 'Construction', icon: 'construct' },
+  { id: 'home_maintenance', label: 'Home Maintenance', icon: 'hammer' },
+  { id: 'errands', label: 'Errands', icon: 'walk' },
   { id: 'companionship', label: 'Companionship', icon: 'people' },
+  { id: 'others', label: 'Others', icon: 'ellipsis-horizontal' },
 ];
+
+interface VoiceNote {
+  uri: string;
+  duration: number;
+}
 
 interface Wish {
   wish_id: string;
   wish_type: string;
+  sub_category?: string;
   title: string;
   description?: string;
   status: string;
@@ -40,11 +48,17 @@ interface Wish {
     address: string;
   };
   created_at: string;
+  has_images?: boolean;
+  has_voice_notes?: boolean;
+  image_count?: number;
+  voice_note_count?: number;
+  images?: string[];
+  voice_notes?: VoiceNote[];
 }
 
 export default function WishDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id, from } = useLocalSearchParams();
   const { sessionToken } = useAuth();
   const { triggerWishesRefresh } = useAppStore();
   
@@ -52,6 +66,8 @@ export default function WishDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
   
   // Edit form state
   const [editTitle, setEditTitle] = useState('');
@@ -80,7 +96,44 @@ export default function WishDetailScreen() {
 
   useEffect(() => {
     fetchWish();
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+    };
   }, [fetchWish]);
+
+  const playVoiceNote = async (index: number) => {
+    if (!wish?.voice_notes) return;
+    
+    try {
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+
+      if (playingIndex === index) {
+        setPlayingIndex(null);
+        return;
+      }
+
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: wish.voice_notes[index].uri },
+        { shouldPlay: true }
+      );
+      
+      soundRef.current = sound;
+      setPlayingIndex(index);
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          setPlayingIndex(null);
+        }
+      });
+    } catch (error) {
+      console.error('Error playing voice note:', error);
+    }
+  };
 
   const handleSave = async () => {
     if (!wish || !sessionToken) return;
@@ -209,8 +262,8 @@ export default function WishDetailScreen() {
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={64} color="#EF4444" />
           <Text style={styles.errorText}>Wish not found</Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>Go Back</Text>
+          <TouchableOpacity style={styles.goBackButton} onPress={() => router.back()}>
+            <Text style={styles.goBackButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -219,6 +272,7 @@ export default function WishDetailScreen() {
 
   const typeInfo = getWishTypeInfo(wish.wish_type);
   const canEdit = wish.status === 'pending';
+  const fromWishbox = from === 'wishbox';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -238,6 +292,7 @@ export default function WishDetailScreen() {
             <Ionicons name="close" size={24} color="#6B7280" />
           </TouchableOpacity>
         )}
+        {!canEdit && <View style={styles.headerButton} />}
       </View>
 
       <ScrollView style={styles.content}>
@@ -263,6 +318,9 @@ export default function WishDetailScreen() {
             </View>
             <View style={styles.typeInfo}>
               <Text style={styles.typeLabel}>{typeInfo.label}</Text>
+              {wish.sub_category && (
+                <Text style={styles.subCategoryText}>{wish.sub_category}</Text>
+              )}
               <Text style={styles.dateText}>Created {formatDate(wish.created_at)}</Text>
             </View>
           </View>
@@ -298,6 +356,67 @@ export default function WishDetailScreen() {
           ) : null}
         </View>
 
+        {/* Attached Images */}
+        {wish.has_images && wish.image_count && wish.image_count > 0 && (
+          <View style={styles.attachmentCard}>
+            <View style={styles.attachmentHeader}>
+              <Ionicons name="images" size={20} color="#6366F1" />
+              <Text style={styles.attachmentTitle}>Attached Images ({wish.image_count})</Text>
+            </View>
+            {wish.images && wish.images.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imagesScroll}>
+                {wish.images.map((uri, index) => (
+                  <Image key={index} source={{ uri }} style={styles.attachedImage} />
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.attachmentPlaceholder}>
+                <Ionicons name="images-outline" size={32} color="#D1D5DB" />
+                <Text style={styles.attachmentPlaceholderText}>
+                  {wish.image_count} image(s) attached
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Voice Notes */}
+        {wish.has_voice_notes && wish.voice_note_count && wish.voice_note_count > 0 && (
+          <View style={styles.attachmentCard}>
+            <View style={styles.attachmentHeader}>
+              <Ionicons name="mic" size={20} color="#6366F1" />
+              <Text style={styles.attachmentTitle}>Voice Notes ({wish.voice_note_count})</Text>
+            </View>
+            {wish.voice_notes && wish.voice_notes.length > 0 ? (
+              wish.voice_notes.map((note, index) => (
+                <View key={index} style={styles.voiceNoteItem}>
+                  <TouchableOpacity 
+                    style={styles.voiceNotePlayButton}
+                    onPress={() => playVoiceNote(index)}
+                  >
+                    <Ionicons 
+                      name={playingIndex === index ? "pause" : "play"} 
+                      size={18} 
+                      color="#fff" 
+                    />
+                  </TouchableOpacity>
+                  <View style={styles.voiceNoteInfo}>
+                    <Text style={styles.voiceNoteName}>Voice Note {index + 1}</Text>
+                    <Text style={styles.voiceNoteDuration}>{note.duration}s</Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.attachmentPlaceholder}>
+                <Ionicons name="mic-outline" size={32} color="#D1D5DB" />
+                <Text style={styles.attachmentPlaceholderText}>
+                  {wish.voice_note_count} voice note(s) attached
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Location */}
         <View style={styles.infoCard}>
           <View style={styles.infoHeader}>
@@ -308,7 +427,7 @@ export default function WishDetailScreen() {
           
           {isEditing ? (
             <View style={styles.editSection}>
-              <Text style={styles.inputLabel}>Search Radius: {editRadius} km</Text>
+              <Text style={styles.inputLabel}>Visibility Radius: {editRadius} km</Text>
               <View style={styles.radiusRow}>
                 <TouchableOpacity
                   style={styles.radiusBtn}
@@ -326,7 +445,7 @@ export default function WishDetailScreen() {
               </View>
             </View>
           ) : (
-            <Text style={styles.radiusText}>Search radius: {wish.radius_km} km</Text>
+            <Text style={styles.radiusText}>Visible to agents within {wish.radius_km} km</Text>
           )}
         </View>
 
@@ -361,7 +480,7 @@ export default function WishDetailScreen() {
             <Text style={styles.infoTitle}>Timing</Text>
           </View>
           <Text style={styles.infoValue}>
-            {wish.is_immediate ? 'Immediate - Need help now' : `Scheduled: ${wish.scheduled_time || 'Not specified'}`}
+            {wish.is_immediate ? 'Immediate - Need help now' : `Scheduled: ${wish.scheduled_time ? formatDate(wish.scheduled_time) : 'Not specified'}`}
           </Text>
         </View>
 
@@ -406,37 +525,18 @@ export default function WishDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 18,
-    color: '#6B7280',
-    marginTop: 16,
-  },
-  backButton: {
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  errorText: { fontSize: 18, color: '#6B7280', marginTop: 16 },
+  goBackButton: {
     marginTop: 16,
     paddingHorizontal: 24,
     paddingVertical: 12,
     backgroundColor: '#6366F1',
     borderRadius: 8,
   },
-  backButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
+  goBackButtonText: { color: '#fff', fontWeight: '600' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -446,38 +546,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
-  headerButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    textAlign: 'center',
-  },
-  content: {
-    flex: 1,
-  },
+  headerButton: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { flex: 1, fontSize: 18, fontWeight: '600', color: '#1F2937', textAlign: 'center' },
+  content: { flex: 1 },
   statusBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 8,
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
+  statusText: { fontSize: 14, fontWeight: '700' },
   immediateBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -487,12 +566,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-  immediateText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#F59E0B',
-    marginLeft: 4,
-  },
+  immediateText: { fontSize: 12, fontWeight: '600', color: '#F59E0B', marginLeft: 4 },
   mainCard: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
@@ -500,11 +574,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
   },
-  typeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
+  typeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   typeIcon: {
     width: 56,
     height: 56,
@@ -513,30 +583,52 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  typeInfo: {
-    marginLeft: 16,
+  typeInfo: { marginLeft: 16 },
+  typeLabel: { fontSize: 16, fontWeight: '600', color: '#6366F1' },
+  subCategoryText: { fontSize: 13, color: '#9CA3AF', marginTop: 2 },
+  dateText: { fontSize: 13, color: '#9CA3AF', marginTop: 4 },
+  title: { fontSize: 22, fontWeight: '700', color: '#1F2937', marginBottom: 8 },
+  description: { fontSize: 15, color: '#6B7280', lineHeight: 22 },
+  
+  // Attachment cards
+  attachmentCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 16,
+    padding: 16,
   },
-  typeLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6366F1',
+  attachmentHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  attachmentTitle: { fontSize: 14, fontWeight: '600', color: '#374151', marginLeft: 8 },
+  imagesScroll: { marginTop: 4 },
+  attachedImage: { width: 100, height: 100, borderRadius: 10, marginRight: 10 },
+  attachmentPlaceholder: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
   },
-  dateText: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    marginTop: 4,
+  attachmentPlaceholderText: { fontSize: 13, color: '#9CA3AF', marginTop: 8 },
+  voiceNoteItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 8,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 8,
+  voiceNotePlayButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#6366F1',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  description: {
-    fontSize: 15,
-    color: '#6B7280',
-    lineHeight: 22,
-  },
+  voiceNoteInfo: { flex: 1, marginLeft: 10 },
+  voiceNoteName: { fontSize: 13, fontWeight: '500', color: '#1F2937' },
+  voiceNoteDuration: { fontSize: 11, color: '#6B7280', marginTop: 2 },
+  
   infoCard: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
@@ -544,40 +636,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
   },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginLeft: 8,
-  },
-  infoValue: {
-    fontSize: 15,
-    color: '#1F2937',
-  },
-  radiusText: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  remunerationValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#10B981',
-  },
-  editSection: {
-    marginTop: 12,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
-    marginBottom: 6,
-  },
+  infoHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  infoTitle: { fontSize: 14, fontWeight: '600', color: '#374151', marginLeft: 8 },
+  infoValue: { fontSize: 15, color: '#1F2937' },
+  radiusText: { fontSize: 13, color: '#6B7280', marginTop: 4 },
+  remunerationValue: { fontSize: 28, fontWeight: '700', color: '#10B981' },
+  
+  editSection: { marginTop: 12 },
+  inputLabel: { fontSize: 13, fontWeight: '600', color: '#6B7280', marginBottom: 6 },
   textInput: {
     backgroundColor: '#F9FAFB',
     borderRadius: 10,
@@ -588,16 +654,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  radiusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
+  textArea: { height: 80, textAlignVertical: 'top' },
+  radiusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   radiusBtn: {
     width: 40,
     height: 40,
@@ -606,12 +664,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  radiusValue: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#6366F1',
-    marginHorizontal: 20,
-  },
+  radiusValue: { fontSize: 20, fontWeight: '600', color: '#6366F1', marginHorizontal: 20 },
   remunerationInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -621,11 +674,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  currencySymbol: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#10B981',
-  },
+  currencySymbol: { fontSize: 20, fontWeight: '600', color: '#10B981' },
   remunerationInput: {
     flex: 1,
     fontSize: 20,
@@ -634,10 +683,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginLeft: 8,
   },
-  editActions: {
-    marginHorizontal: 16,
-    marginTop: 24,
-  },
+  editActions: { marginHorizontal: 16, marginTop: 24 },
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -646,19 +692,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
   },
-  saveButtonDisabled: {
-    backgroundColor: '#D1D5DB',
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-    marginLeft: 8,
-  },
-  actions: {
-    marginHorizontal: 16,
-    marginTop: 24,
-  },
+  saveButtonDisabled: { backgroundColor: '#D1D5DB' },
+  saveButtonText: { fontSize: 16, fontWeight: '600', color: '#fff', marginLeft: 8 },
+  actions: { marginHorizontal: 16, marginTop: 24 },
   completeButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -668,12 +704,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
   },
-  completeButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-    marginLeft: 8,
-  },
+  completeButtonText: { fontSize: 16, fontWeight: '600', color: '#fff', marginLeft: 8 },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -682,10 +713,5 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
   },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#EF4444',
-    marginLeft: 8,
-  },
+  deleteButtonText: { fontSize: 16, fontWeight: '600', color: '#EF4444', marginLeft: 8 },
 });
