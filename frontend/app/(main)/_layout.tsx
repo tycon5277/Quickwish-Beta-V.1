@@ -1,12 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform, StyleSheet, View, Dimensions, Animated, PanResponder } from 'react-native';
+import { Platform, StyleSheet, View, PanResponder, GestureResponderEvent, PanResponderGestureState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../_layout';
 
 const TAB_ROUTES = ['home', 'explore', 'chat', 'localhub', 'account'];
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SWIPE_THRESHOLD = 50;
 
 export default function MainLayout() {
@@ -15,8 +14,8 @@ export default function MainLayout() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const swipeAnim = useRef(new Animated.Value(0)).current;
+  // Use ref to track current index to avoid stale closure
+  const currentIndexRef = useRef(0);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -24,46 +23,45 @@ export default function MainLayout() {
     }
   }, [isAuthenticated, isLoading]);
 
-  // Update current index based on pathname
+  // Update current index ref based on pathname
   useEffect(() => {
     const route = pathname.split('/').pop() || 'home';
     const index = TAB_ROUTES.indexOf(route);
     if (index !== -1) {
-      setCurrentIndex(index);
+      currentIndexRef.current = index;
     }
   }, [pathname]);
 
-  const navigateToTab = (index: number) => {
-    if (index >= 0 && index < TAB_ROUTES.length && index !== currentIndex) {
+  const navigateToTab = useCallback((index: number) => {
+    if (index >= 0 && index < TAB_ROUTES.length) {
       router.push(`/(main)/${TAB_ROUTES[index]}`);
     }
-  };
+  }, [router]);
+
+  const handlePanResponderRelease = useCallback((
+    _: GestureResponderEvent,
+    gestureState: PanResponderGestureState
+  ) => {
+    const currentIndex = currentIndexRef.current;
+    
+    if (gestureState.dx > SWIPE_THRESHOLD && currentIndex > 0) {
+      // Swipe right - go to previous tab
+      navigateToTab(currentIndex - 1);
+    } else if (gestureState.dx < -SWIPE_THRESHOLD && currentIndex < TAB_ROUTES.length - 1) {
+      // Swipe left - go to next tab
+      navigateToTab(currentIndex + 1);
+    }
+  }, [navigateToTab]);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to horizontal swipes
-        return Math.abs(gestureState.dx) > 10 && Math.abs(gestureState.dy) < 30;
+        // Only respond to horizontal swipes with significant movement
+        return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dy) < 40;
       },
-      onPanResponderMove: (_, gestureState) => {
-        swipeAnim.setValue(gestureState.dx);
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx > SWIPE_THRESHOLD && currentIndex > 0) {
-          // Swipe right - go to previous tab
-          navigateToTab(currentIndex - 1);
-        } else if (gestureState.dx < -SWIPE_THRESHOLD && currentIndex < TAB_ROUTES.length - 1) {
-          // Swipe left - go to next tab
-          navigateToTab(currentIndex + 1);
-        }
-        
-        // Reset animation
-        Animated.spring(swipeAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-      },
+      onPanResponderRelease: handlePanResponderRelease,
+      onPanResponderTerminate: () => {},
     })
   ).current;
 
