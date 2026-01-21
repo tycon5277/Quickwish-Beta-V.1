@@ -184,19 +184,21 @@ export default function HomeScreen() {
     switch (type) {
       case 'delivery': return 'bicycle';
       case 'ride_request': return 'car';
+      case 'commercial_ride': return 'bus';
       case 'medicine_delivery': return 'medkit';
-      case 'household_chores': return 'home';
-      case 'errands': return 'walk';
-      case 'domestic_help': return 'hand-left';
+      case 'domestic_help': return 'home';
       case 'construction': return 'construct';
+      case 'home_maintenance': return 'hammer';
+      case 'errands': return 'walk';
       case 'companionship': return 'people';
+      case 'others': return 'ellipsis-horizontal';
       default: return 'help-circle';
     }
   };
 
   const activeWishes = wishes.filter(w => ['pending', 'accepted', 'in_progress'].includes(w.status));
-  const displayWishes = activeWishes.slice(0, 5);
-  const hasMoreWishes = activeWishes.length > 5;
+  const displayWishes = activeWishes.slice(0, 3); // Max 3 wishes on home screen
+  const hasMoreWishes = activeWishes.length > 3;
 
   // Get location from store if available
   const { userLocation } = useAppStore();
