@@ -211,8 +211,8 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(main)" />
         <Stack.Screen name="wishbox" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="chat/[id]" options={{ presentation: 'card' }} />
-        <Stack.Screen name="wish/create" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="chat" />
+        <Stack.Screen name="wish" />
       </Stack>
     </AuthProvider>
   );
