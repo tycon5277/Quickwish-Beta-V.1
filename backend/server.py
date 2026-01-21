@@ -329,6 +329,49 @@ async def cancel_wish(wish_id: str, current_user: User = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="Cannot cancel this wish")
     return {"message": "Wish cancelled"}
 
+@api_router.put("/wishes/{wish_id}/complete")
+async def complete_wish(wish_id: str, current_user: User = Depends(require_auth)):
+    """Mark a wish as completed"""
+    result = await db.wishes.update_one(
+        {"wish_id": wish_id, "user_id": current_user.user_id, "status": {"$in": ["pending", "accepted", "in_progress"]}},
+        {"$set": {"status": "completed"}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=400, detail="Cannot complete this wish")
+    return {"message": "Wish marked as completed"}
+
+@api_router.delete("/wishes/{wish_id}")
+async def delete_wish(wish_id: str, current_user: User = Depends(require_auth)):
+    """Delete a wish"""
+    result = await db.wishes.delete_one(
+        {"wish_id": wish_id, "user_id": current_user.user_id}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Wish not found or cannot be deleted")
+    return {"message": "Wish deleted"}
+
+@api_router.put("/wishes/{wish_id}")
+async def update_wish(wish_id: str, wish_data: WishCreate, current_user: User = Depends(require_auth)):
+    """Update a wish"""
+    # Only allow updating pending wishes
+    existing_wish = await db.wishes.find_one(
+        {"wish_id": wish_id, "user_id": current_user.user_id},
+        {"_id": 0}
+    )
+    if not existing_wish:
+        raise HTTPException(status_code=404, detail="Wish not found")
+    if existing_wish["status"] != "pending":
+        raise HTTPException(status_code=400, detail="Can only edit pending wishes")
+    
+    update_data = wish_data.dict()
+    await db.wishes.update_one(
+        {"wish_id": wish_id},
+        {"$set": update_data}
+    )
+    
+    updated_wish = await db.wishes.find_one({"wish_id": wish_id}, {"_id": 0})
+    return Wish(**updated_wish)
+
 # ===================== CHAT ENDPOINTS =====================
 
 @api_router.get("/chat/rooms", response_model=List[dict])
