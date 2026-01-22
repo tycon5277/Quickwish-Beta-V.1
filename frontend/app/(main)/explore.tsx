@@ -975,6 +975,23 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 3,
   },
+  highlightIndicators: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 6,
+  },
+  highlightDotIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#D1D5DB',
+  },
+  highlightDotActive: {
+    width: 20,
+    backgroundColor: '#8B5CF6',
+  },
   
   // Feed Section
   feedSection: {
