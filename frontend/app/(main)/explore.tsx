@@ -386,13 +386,17 @@ export default function ExploreScreen() {
             </View>
           </View>
           <ScrollView 
+            ref={highlightsScrollRef}
             horizontal 
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.highlightsContainer}
             decelerationRate="fast"
-            snapToInterval={SCREEN_WIDTH * 0.75 + 12}
+            snapToInterval={HIGHLIGHT_CARD_WIDTH}
+            onScrollBeginDrag={handleHighlightScrollBegin}
+            onMomentumScrollEnd={handleHighlightScrollEnd}
+            onScrollEndDrag={handleHighlightScrollEnd}
           >
-            {sortedStories.map((story) => {
+            {sortedStories.map((story, index) => {
               const config = CREATOR_CONFIG[story.creator_type];
               return (
                 <TouchableOpacity 
