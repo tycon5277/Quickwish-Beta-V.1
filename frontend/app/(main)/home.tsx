@@ -240,12 +240,15 @@ export default function HomeScreen() {
           style={styles.wishboxButton}
           onPress={() => router.push('/wishbox')}
         >
-          <Ionicons name="layers" size={24} color="#6366F1" />
-          {activeWishes.length > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{activeWishes.length}</Text>
-            </View>
-          )}
+          <View style={styles.wishboxIconContainer}>
+            <Ionicons name="file-tray-full" size={22} color="#6366F1" />
+            {activeWishes.length > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{activeWishes.length}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.wishboxLabel}>Wish Box</Text>
         </TouchableOpacity>
       </View>
 
