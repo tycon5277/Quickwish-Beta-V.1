@@ -120,6 +120,7 @@ const Confetti = ({ visible }: { visible: boolean }) => {
 export default function ShopScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const vendorId = typeof params.id === 'string' ? params.id : params.id?.[0] || '';
   const { sessionToken, user } = useAuth();
   
