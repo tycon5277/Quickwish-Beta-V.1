@@ -1,0 +1,987 @@
+{
+  "summary": {
+    "total_tests": 22,
+    "passed_tests": 19,
+    "success_rate": "86.4%",
+    "backend_url": "https://wishmarket.preview.emergentagent.com",
+    "timestamp": "2026-01-22T12:16:28.317296"
+  },
+  "performance_metrics": {
+    "avg_response_time_ms": 108.77,
+    "max_response_time_ms": 1454.81,
+    "min_response_time_ms": 33.41,
+    "slow_requests_count": 1
+  },
+  "detailed_results": [
+    {
+      "test_name": "Health Check",
+      "success": true,
+      "response_time_ms": 80.99,
+      "status_code": 200,
+      "details": "Status: 200, Response: {'status': 'healthy'}",
+      "timestamp": "2026-01-22T12:16:25.990465",
+      "response_data": {
+        "status": "healthy"
+      }
+    },
+    {
+      "test_name": "Explore API",
+      "success": true,
+      "response_time_ms": 43.47,
+      "status_code": 200,
+      "details": "Found 24 explore posts",
+      "timestamp": "2026-01-22T12:16:26.034607",
+      "response_data": [
+        {
+          "post_id": "post_e2fab509",
+          "title": "Local Hero: Ramesh completes 1000th delivery! \ud83c\udf89",
+          "content": "Ramesh Kumar, a fulfillment agent from Sector 5, has completed his 1000th delivery task. Community members praised his dedication and reliability.",
+          "post_type": "milestone",
+          "image": null,
+          "created_at": "2026-01-22T12:15:20.865000"
+        },
+        {
+          "post_id": "post_333e0aa2",
+          "title": "Weekend Community Market",
+          "content": "Join us this Saturday at Central Park for our monthly community market. Fresh produce, handicrafts, and local delicacies!",
+          "post_type": "event",
+          "image": null,
+          "created_at": "2026-01-22T12:15:20.865000"
+        },
+        {
+          "post_id": "post_73ff715f",
+          "title": "New Feature: Schedule Your Wishes!",
+          "content": "You can now schedule your wishes for a later time. Perfect for planning ahead!",
+          "post_type": "news",
+          "image": null,
+          "created_at": "2026-01-22T12:15:20.865000"
+        },
+        {
+          "post_id": "post_2c6b0c78",
+          "title": "Local Hero: Ramesh completes 1000th delivery! \ud83c\udf89",
+          "content": "Ramesh Kumar, a fulfillment agent from Sector 5, has completed his 1000th delivery task. Community members praised his dedication and reliability.",
+          "post_type": "milestone",
+          "image": null,
+          "created_at": "2026-01-22T10:33:11.933000"
+        },
+        {
+          "post_id": "post_2017139c",
+          "title": "Weekend Community Market",
+          "content": "Join us this Saturday at Central Park for our monthly community market. Fresh produce, handicrafts, and local delicacies!",
+          "post_type": "event",
+          "image": null,
+          "created_at": "2026-01-22T10:33:11.933000"
+        },
+        {
+          "post_id": "post_109eb524",
+          "title": "New Feature: Schedule Your Wishes!",
+          "content": "You can now schedule your wishes for a later time. Perfect for planning ahead!",
+          "post_type": "news",
+          "image": null,
+          "created_at": "2026-01-22T10:33:11.933000"
+        },
+        {
+          "post_id": "post_3088f1db",
+          "title": "Local Hero: Ramesh completes 1000th delivery! \ud83c\udf89",
+          "content": "Ramesh Kumar, a fulfillment agent from Sector 5, has completed his 1000th delivery task. Community members praised his dedication and reliability.",
+          "post_type": "milestone",
+          "image": null,
+          "created_at": "2026-01-21T13:04:28.373000"
+        },
+        {
+          "post_id": "post_1caeac9d",
+          "title": "Weekend Community Market",
+          "content": "Join us this Saturday at Central Park for our monthly community market. Fresh produce, handicrafts, and local delicacies!",
+          "post_type": "event",
+          "image": null,
+          "created_at": "2026-01-21T13:04:28.373000"
+        },
+        {
+          "post_id": "post_3104aa9b",
+          "title": "New Feature: Schedule Your Wishes!",
+          "content": "You can now schedule your wishes for a later time. Perfect for planning ahead!",
+          "post_type": "news",
+          "image": null,
+          "created_at": "2026-01-21T13:04:28.373000"
+        },
+        {
+          "post_id": "post_93b8ab2d",
+          "title": "Local Hero: Ramesh completes 1000th delivery! \ud83c\udf89",
+          "content": "Ramesh Kumar, a fulfillment agent from Sector 5, has completed his 1000th delivery task. Community members praised his dedication and reliability.",
+          "post_type": "milestone",
+          "image": null,
+          "created_at": "2026-01-21T13:04:05.320000"
+        },
+        {
+          "post_id": "post_b6928ae1",
+          "title": "Weekend Community Market",
+          "content": "Join us this Saturday at Central Park for our monthly community market. Fresh produce, handicrafts, and local delicacies!",
+          "post_type": "event",
+          "image": null,
+          "created_at": "2026-01-21T13:04:05.320000"
+        },
+        {
+          "post_id": "post_17db4259",
+          "title": "New Feature: Schedule Your Wishes!",
+          "content": "You can now schedule your wishes for a later time. Perfect for planning ahead!",
+          "post_type": "news",
+          "image": null,
+          "created_at": "2026-01-21T13:04:05.320000"
+        },
+        {
+          "post_id": "post_7179edd8",
+          "title": "Local Hero: Ramesh completes 1000th delivery! \ud83c\udf89",
+          "content": "Ramesh Kumar, a fulfillment agent from Sector 5, has completed his 1000th delivery task. Community members praised his dedication and reliability.",
+          "post_type": "milestone",
+          "image": null,
+          "created_at": "2026-01-21T13:02:52.542000"
+        },
+        {
+          "post_id": "post_a20f2fb6",
+          "title": "Weekend Community Market",
+          "content": "Join us this Saturday at Central Park for our monthly community market. Fresh produce, handicrafts, and local delicacies!",
+          "post_type": "event",
+          "image": null,
+          "created_at": "2026-01-21T13:02:52.542000"
+        },
+        {
+          "post_id": "post_6db43785",
+          "title": "New Feature: Schedule Your Wishes!",
+          "content": "You can now schedule your wishes for a later time. Perfect for planning ahead!",
+          "post_type": "news",
+          "image": null,
+          "created_at": "2026-01-21T13:02:52.542000"
+        },
+        {
+          "post_id": "post_6da5202d",
+          "title": "Local Hero: Ramesh completes 1000th delivery! \ud83c\udf89",
+          "content": "Ramesh Kumar, a fulfillment agent from Sector 5, has completed his 1000th delivery task. Community members praised his dedication and reliability.",
+          "post_type": "milestone",
+          "image": null,
+          "created_at": "2026-01-21T13:00:34.248000"
+        },
+        {
+          "post_id": "post_62fb7e5a",
+          "title": "Weekend Community Market",
+          "content": "Join us this Saturday at Central Park for our monthly community market. Fresh produce, handicrafts, and local delicacies!",
+          "post_type": "event",
+          "image": null,
+          "created_at": "2026-01-21T13:00:34.248000"
+        },
+        {
+          "post_id": "post_934ca07f",
+          "title": "New Feature: Schedule Your Wishes!",
+          "content": "You can now schedule your wishes for a later time. Perfect for planning ahead!",
+          "post_type": "news",
+          "image": null,
+          "created_at": "2026-01-21T13:00:34.248000"
+        },
+        {
+          "post_id": "post_952b4aa2",
+          "title": "Local Hero: Ramesh completes 1000th delivery! \ud83c\udf89",
+          "content": "Ramesh Kumar, a fulfillment agent from Sector 5, has completed his 1000th delivery task. Community members praised his dedication and reliability.",
+          "post_type": "milestone",
+          "image": null,
+          "created_at": "2026-01-21T10:28:09.658000"
+        },
+        {
+          "post_id": "post_cf8aa3cf",
+          "title": "Weekend Community Market",
+          "content": "Join us this Saturday at Central Park for our monthly community market. Fresh produce, handicrafts, and local delicacies!",
+          "post_type": "event",
+          "image": null,
+          "created_at": "2026-01-21T10:28:09.658000"
+        },
+        {
+          "post_id": "post_3486760b",
+          "title": "New Feature: Schedule Your Wishes!",
+          "content": "You can now schedule your wishes for a later time. Perfect for planning ahead!",
+          "post_type": "news",
+          "image": null,
+          "created_at": "2026-01-21T10:28:09.658000"
+        },
+        {
+          "post_id": "post_5401be1c",
+          "title": "Local Hero: Ramesh completes 1000th delivery! \ud83c\udf89",
+          "content": "Ramesh Kumar, a fulfillment agent from Sector 5, has completed his 1000th delivery task. Community members praised his dedication and reliability.",
+          "post_type": "milestone",
+          "image": null,
+          "created_at": "2026-01-21T10:25:01.292000"
+        },
+        {
+          "post_id": "post_e4359dec",
+          "title": "Weekend Community Market",
+          "content": "Join us this Saturday at Central Park for our monthly community market. Fresh produce, handicrafts, and local delicacies!",
+          "post_type": "event",
+          "image": null,
+          "created_at": "2026-01-21T10:25:01.292000"
+        },
+        {
+          "post_id": "post_0c0f9b0e",
+          "title": "New Feature: Schedule Your Wishes!",
+          "content": "You can now schedule your wishes for a later time. Perfect for planning ahead!",
+          "post_type": "news",
+          "image": null,
+          "created_at": "2026-01-21T10:25:01.292000"
+        }
+      ]
+    },
+    {
+      "test_name": "LocalHub API",
+      "success": true,
+      "response_time_ms": 38.43,
+      "status_code": 200,
+      "details": "Found 40 local businesses",
+      "timestamp": "2026-01-22T12:16:26.073741",
+      "response_data": [
+        {
+          "business_id": "biz_aec11395",
+          "name": "Fresh Fruits by Lakshmi",
+          "category": "Fruits & Vegetables",
+          "description": "Fresh seasonal fruits delivered to your doorstep",
+          "image": null,
+          "location": {
+            "lat": 12.9716,
+            "lng": 77.5946,
+            "address": "Sector 3, Local Market"
+          },
+          "rating": 4.8,
+          "created_at": "2026-01-21T10:25:01.314000"
+        },
+        {
+          "business_id": "biz_fb4c2849",
+          "name": "Amma's Kitchen",
+          "category": "Home Kitchen",
+          "description": "Authentic home-cooked meals with love",
+          "image": null,
+          "location": {
+            "lat": 12.972,
+            "lng": 77.595,
+            "address": "Block B, Apartment 204"
+          },
+          "rating": 4.9,
+          "created_at": "2026-01-21T10:25:01.314000"
+        },
+        {
+          "business_id": "biz_9f6cbcf5",
+          "name": "Ravi's Handicrafts",
+          "category": "Artisan",
+          "description": "Handmade traditional crafts and decorations",
+          "image": null,
+          "location": {
+            "lat": 12.971,
+            "lng": 77.594,
+            "address": "Craft Lane, Shop 12"
+          },
+          "rating": 4.7,
+          "created_at": "2026-01-21T10:25:01.314000"
+        },
+        {
+          "business_id": "biz_8591057b",
+          "name": "Quick Pharmacy",
+          "category": "Pharmacy",
+          "description": "24/7 medicine delivery in your area",
+          "image": null,
+          "location": {
+            "lat": 12.9725,
+            "lng": 77.5955,
+            "address": "Main Road, Near Bus Stop"
+          },
+          "rating": 4.6,
+          "created_at": "2026-01-21T10:25:01.314000"
+        },
+        {
+          "business_id": "biz_fbf14f0e",
+          "name": "Green Grocery",
+          "category": "Grocery",
+          "description": "Daily essentials and grocery items",
+          "image": null,
+          "location": {
+            "lat": 12.9718,
+            "lng": 77.5948,
+            "address": "Sector 2, Shop 5"
+          },
+          "rating": 4.5,
+          "created_at": "2026-01-21T10:25:01.314000"
+        },
+        {
+          "business_id": "biz_26c0c4de",
+          "name": "Fresh Fruits by Lakshmi",
+          "category": "Fruits & Vegetables",
+          "description": "Fresh seasonal fruits delivered to your doorstep",
+          "image": null,
+          "location": {
+            "lat": 12.9716,
+            "lng": 77.5946,
+            "address": "Sector 3, Local Market"
+          },
+          "rating": 4.8,
+          "created_at": "2026-01-21T10:28:09.661000"
+        },
+        {
+          "business_id": "biz_288e258b",
+          "name": "Amma's Kitchen",
+          "category": "Home Kitchen",
+          "description": "Authentic home-cooked meals with love",
+          "image": null,
+          "location": {
+            "lat": 12.972,
+            "lng": 77.595,
+            "address": "Block B, Apartment 204"
+          },
+          "rating": 4.9,
+          "created_at": "2026-01-21T10:28:09.661000"
+        },
+        {
+          "business_id": "biz_551afb7b",
+          "name": "Ravi's Handicrafts",
+          "category": "Artisan",
+          "description": "Handmade traditional crafts and decorations",
+          "image": null,
+          "location": {
+            "lat": 12.971,
+            "lng": 77.594,
+            "address": "Craft Lane, Shop 12"
+          },
+          "rating": 4.7,
+          "created_at": "2026-01-21T10:28:09.661000"
+        },
+        {
+          "business_id": "biz_c836d5fe",
+          "name": "Quick Pharmacy",
+          "category": "Pharmacy",
+          "description": "24/7 medicine delivery in your area",
+          "image": null,
+          "location": {
+            "lat": 12.9725,
+            "lng": 77.5955,
+            "address": "Main Road, Near Bus Stop"
+          },
+          "rating": 4.6,
+          "created_at": "2026-01-21T10:28:09.661000"
+        },
+        {
+          "business_id": "biz_12ac4a3d",
+          "name": "Green Grocery",
+          "category": "Grocery",
+          "description": "Daily essentials and grocery items",
+          "image": null,
+          "location": {
+            "lat": 12.9718,
+            "lng": 77.5948,
+            "address": "Sector 2, Shop 5"
+          },
+          "rating": 4.5,
+          "created_at": "2026-01-21T10:28:09.661000"
+        },
+        {
+          "business_id": "biz_a21b3322",
+          "name": "Fresh Fruits by Lakshmi",
+          "category": "Fruits & Vegetables",
+          "description": "Fresh seasonal fruits delivered to your doorstep",
+          "image": null,
+          "location": {
+            "lat": 12.9716,
+            "lng": 77.5946,
+            "address": "Sector 3, Local Market"
+          },
+          "rating": 4.8,
+          "created_at": "2026-01-21T13:00:34.252000"
+        },
+        {
+          "business_id": "biz_f6b83e8c",
+          "name": "Amma's Kitchen",
+          "category": "Home Kitchen",
+          "description": "Authentic home-cooked meals with love",
+          "image": null,
+          "location": {
+            "lat": 12.972,
+            "lng": 77.595,
+            "address": "Block B, Apartment 204"
+          },
+          "rating": 4.9,
+          "created_at": "2026-01-21T13:00:34.252000"
+        },
+        {
+          "business_id": "biz_23c54280",
+          "name": "Ravi's Handicrafts",
+          "category": "Artisan",
+          "description": "Handmade traditional crafts and decorations",
+          "image": null,
+          "location": {
+            "lat": 12.971,
+            "lng": 77.594,
+            "address": "Craft Lane, Shop 12"
+          },
+          "rating": 4.7,
+          "created_at": "2026-01-21T13:00:34.252000"
+        },
+        {
+          "business_id": "biz_e86c1da8",
+          "name": "Quick Pharmacy",
+          "category": "Pharmacy",
+          "description": "24/7 medicine delivery in your area",
+          "image": null,
+          "location": {
+            "lat": 12.9725,
+            "lng": 77.5955,
+            "address": "Main Road, Near Bus Stop"
+          },
+          "rating": 4.6,
+          "created_at": "2026-01-21T13:00:34.252000"
+        },
+        {
+          "business_id": "biz_55ad9169",
+          "name": "Green Grocery",
+          "category": "Grocery",
+          "description": "Daily essentials and grocery items",
+          "image": null,
+          "location": {
+            "lat": 12.9718,
+            "lng": 77.5948,
+            "address": "Sector 2, Shop 5"
+          },
+          "rating": 4.5,
+          "created_at": "2026-01-21T13:00:34.252000"
+        },
+        {
+          "business_id": "biz_6de9899d",
+          "name": "Fresh Fruits by Lakshmi",
+          "category": "Fruits & Vegetables",
+          "description": "Fresh seasonal fruits delivered to your doorstep",
+          "image": null,
+          "location": {
+            "lat": 12.9716,
+            "lng": 77.5946,
+            "address": "Sector 3, Local Market"
+          },
+          "rating": 4.8,
+          "created_at": "2026-01-21T13:02:52.544000"
+        },
+        {
+          "business_id": "biz_6b653d09",
+          "name": "Amma's Kitchen",
+          "category": "Home Kitchen",
+          "description": "Authentic home-cooked meals with love",
+          "image": null,
+          "location": {
+            "lat": 12.972,
+            "lng": 77.595,
+            "address": "Block B, Apartment 204"
+          },
+          "rating": 4.9,
+          "created_at": "2026-01-21T13:02:52.544000"
+        },
+        {
+          "business_id": "biz_d024af39",
+          "name": "Ravi's Handicrafts",
+          "category": "Artisan",
+          "description": "Handmade traditional crafts and decorations",
+          "image": null,
+          "location": {
+            "lat": 12.971,
+            "lng": 77.594,
+            "address": "Craft Lane, Shop 12"
+          },
+          "rating": 4.7,
+          "created_at": "2026-01-21T13:02:52.544000"
+        },
+        {
+          "business_id": "biz_dee543c9",
+          "name": "Quick Pharmacy",
+          "category": "Pharmacy",
+          "description": "24/7 medicine delivery in your area",
+          "image": null,
+          "location": {
+            "lat": 12.9725,
+            "lng": 77.5955,
+            "address": "Main Road, Near Bus Stop"
+          },
+          "rating": 4.6,
+          "created_at": "2026-01-21T13:02:52.544000"
+        },
+        {
+          "business_id": "biz_d8da139f",
+          "name": "Green Grocery",
+          "category": "Grocery",
+          "description": "Daily essentials and grocery items",
+          "image": null,
+          "location": {
+            "lat": 12.9718,
+            "lng": 77.5948,
+            "address": "Sector 2, Shop 5"
+          },
+          "rating": 4.5,
+          "created_at": "2026-01-21T13:02:52.544000"
+        },
+        {
+          "business_id": "biz_c6a55418",
+          "name": "Fresh Fruits by Lakshmi",
+          "category": "Fruits & Vegetables",
+          "description": "Fresh seasonal fruits delivered to your doorstep",
+          "image": null,
+          "location": {
+            "lat": 12.9716,
+            "lng": 77.5946,
+            "address": "Sector 3, Local Market"
+          },
+          "rating": 4.8,
+          "created_at": "2026-01-21T13:04:05.322000"
+        },
+        {
+          "business_id": "biz_6c4e46b0",
+          "name": "Amma's Kitchen",
+          "category": "Home Kitchen",
+          "description": "Authentic home-cooked meals with love",
+          "image": null,
+          "location": {
+            "lat": 12.972,
+            "lng": 77.595,
+            "address": "Block B, Apartment 204"
+          },
+          "rating": 4.9,
+          "created_at": "2026-01-21T13:04:05.322000"
+        },
+        {
+          "business_id": "biz_ecf1c350",
+          "name": "Ravi's Handicrafts",
+          "category": "Artisan",
+          "description": "Handmade traditional crafts and decorations",
+          "image": null,
+          "location": {
+            "lat": 12.971,
+            "lng": 77.594,
+            "address": "Craft Lane, Shop 12"
+          },
+          "rating": 4.7,
+          "created_at": "2026-01-21T13:04:05.322000"
+        },
+        {
+          "business_id": "biz_696fda92",
+          "name": "Quick Pharmacy",
+          "category": "Pharmacy",
+          "description": "24/7 medicine delivery in your area",
+          "image": null,
+          "location": {
+            "lat": 12.9725,
+            "lng": 77.5955,
+            "address": "Main Road, Near Bus Stop"
+          },
+          "rating": 4.6,
+          "created_at": "2026-01-21T13:04:05.322000"
+        },
+        {
+          "business_id": "biz_c220ff49",
+          "name": "Green Grocery",
+          "category": "Grocery",
+          "description": "Daily essentials and grocery items",
+          "image": null,
+          "location": {
+            "lat": 12.9718,
+            "lng": 77.5948,
+            "address": "Sector 2, Shop 5"
+          },
+          "rating": 4.5,
+          "created_at": "2026-01-21T13:04:05.322000"
+        },
+        {
+          "business_id": "biz_90808938",
+          "name": "Fresh Fruits by Lakshmi",
+          "category": "Fruits & Vegetables",
+          "description": "Fresh seasonal fruits delivered to your doorstep",
+          "image": null,
+          "location": {
+            "lat": 12.9716,
+            "lng": 77.5946,
+            "address": "Sector 3, Local Market"
+          },
+          "rating": 4.8,
+          "created_at": "2026-01-21T13:04:28.375000"
+        },
+        {
+          "business_id": "biz_ff6a2332",
+          "name": "Amma's Kitchen",
+          "category": "Home Kitchen",
+          "description": "Authentic home-cooked meals with love",
+          "image": null,
+          "location": {
+            "lat": 12.972,
+            "lng": 77.595,
+            "address": "Block B, Apartment 204"
+          },
+          "rating": 4.9,
+          "created_at": "2026-01-21T13:04:28.375000"
+        },
+        {
+          "business_id": "biz_d1da7597",
+          "name": "Ravi's Handicrafts",
+          "category": "Artisan",
+          "description": "Handmade traditional crafts and decorations",
+          "image": null,
+          "location": {
+            "lat": 12.971,
+            "lng": 77.594,
+            "address": "Craft Lane, Shop 12"
+          },
+          "rating": 4.7,
+          "created_at": "2026-01-21T13:04:28.375000"
+        },
+        {
+          "business_id": "biz_94fa6fd6",
+          "name": "Quick Pharmacy",
+          "category": "Pharmacy",
+          "description": "24/7 medicine delivery in your area",
+          "image": null,
+          "location": {
+            "lat": 12.9725,
+            "lng": 77.5955,
+            "address": "Main Road, Near Bus Stop"
+          },
+          "rating": 4.6,
+          "created_at": "2026-01-21T13:04:28.375000"
+        },
+        {
+          "business_id": "biz_1ad76320",
+          "name": "Green Grocery",
+          "category": "Grocery",
+          "description": "Daily essentials and grocery items",
+          "image": null,
+          "location": {
+            "lat": 12.9718,
+            "lng": 77.5948,
+            "address": "Sector 2, Shop 5"
+          },
+          "rating": 4.5,
+          "created_at": "2026-01-21T13:04:28.375000"
+        },
+        {
+          "business_id": "biz_63f91aa4",
+          "name": "Fresh Fruits by Lakshmi",
+          "category": "Fruits & Vegetables",
+          "description": "Fresh seasonal fruits delivered to your doorstep",
+          "image": null,
+          "location": {
+            "lat": 12.9716,
+            "lng": 77.5946,
+            "address": "Sector 3, Local Market"
+          },
+          "rating": 4.8,
+          "created_at": "2026-01-22T10:33:11.944000"
+        },
+        {
+          "business_id": "biz_b433da47",
+          "name": "Amma's Kitchen",
+          "category": "Home Kitchen",
+          "description": "Authentic home-cooked meals with love",
+          "image": null,
+          "location": {
+            "lat": 12.972,
+            "lng": 77.595,
+            "address": "Block B, Apartment 204"
+          },
+          "rating": 4.9,
+          "created_at": "2026-01-22T10:33:11.944000"
+        },
+        {
+          "business_id": "biz_b9a9e53f",
+          "name": "Ravi's Handicrafts",
+          "category": "Artisan",
+          "description": "Handmade traditional crafts and decorations",
+          "image": null,
+          "location": {
+            "lat": 12.971,
+            "lng": 77.594,
+            "address": "Craft Lane, Shop 12"
+          },
+          "rating": 4.7,
+          "created_at": "2026-01-22T10:33:11.944000"
+        },
+        {
+          "business_id": "biz_27e55413",
+          "name": "Quick Pharmacy",
+          "category": "Pharmacy",
+          "description": "24/7 medicine delivery in your area",
+          "image": null,
+          "location": {
+            "lat": 12.9725,
+            "lng": 77.5955,
+            "address": "Main Road, Near Bus Stop"
+          },
+          "rating": 4.6,
+          "created_at": "2026-01-22T10:33:11.944000"
+        },
+        {
+          "business_id": "biz_5ea303c1",
+          "name": "Green Grocery",
+          "category": "Grocery",
+          "description": "Daily essentials and grocery items",
+          "image": null,
+          "location": {
+            "lat": 12.9718,
+            "lng": 77.5948,
+            "address": "Sector 2, Shop 5"
+          },
+          "rating": 4.5,
+          "created_at": "2026-01-22T10:33:11.944000"
+        },
+        {
+          "business_id": "biz_4c988c42",
+          "name": "Fresh Fruits by Lakshmi",
+          "category": "Fruits & Vegetables",
+          "description": "Fresh seasonal fruits delivered to your doorstep",
+          "image": null,
+          "location": {
+            "lat": 12.9716,
+            "lng": 77.5946,
+            "address": "Sector 3, Local Market"
+          },
+          "rating": 4.8,
+          "created_at": "2026-01-22T12:15:20.871000"
+        },
+        {
+          "business_id": "biz_601d3c72",
+          "name": "Amma's Kitchen",
+          "category": "Home Kitchen",
+          "description": "Authentic home-cooked meals with love",
+          "image": null,
+          "location": {
+            "lat": 12.972,
+            "lng": 77.595,
+            "address": "Block B, Apartment 204"
+          },
+          "rating": 4.9,
+          "created_at": "2026-01-22T12:15:20.871000"
+        },
+        {
+          "business_id": "biz_9acef2ec",
+          "name": "Ravi's Handicrafts",
+          "category": "Artisan",
+          "description": "Handmade traditional crafts and decorations",
+          "image": null,
+          "location": {
+            "lat": 12.971,
+            "lng": 77.594,
+            "address": "Craft Lane, Shop 12"
+          },
+          "rating": 4.7,
+          "created_at": "2026-01-22T12:15:20.871000"
+        },
+        {
+          "business_id": "biz_e4b6c5ad",
+          "name": "Quick Pharmacy",
+          "category": "Pharmacy",
+          "description": "24/7 medicine delivery in your area",
+          "image": null,
+          "location": {
+            "lat": 12.9725,
+            "lng": 77.5955,
+            "address": "Main Road, Near Bus Stop"
+          },
+          "rating": 4.6,
+          "created_at": "2026-01-22T12:15:20.871000"
+        },
+        {
+          "business_id": "biz_89babb91",
+          "name": "Green Grocery",
+          "category": "Grocery",
+          "description": "Daily essentials and grocery items",
+          "image": null,
+          "location": {
+            "lat": 12.9718,
+            "lng": 77.5948,
+            "address": "Sector 2, Shop 5"
+          },
+          "rating": 4.5,
+          "created_at": "2026-01-22T12:15:20.871000"
+        }
+      ]
+    },
+    {
+      "test_name": "LocalHub Categories",
+      "success": true,
+      "response_time_ms": 40.25,
+      "status_code": 200,
+      "details": "Found 5 categories: ['Artisan', 'Fruits & Vegetables', 'Grocery', 'Home Kitchen', 'Pharmacy']",
+      "timestamp": "2026-01-22T12:16:26.114627",
+      "response_data": [
+        "Artisan",
+        "Fruits & Vegetables",
+        "Grocery",
+        "Home Kitchen",
+        "Pharmacy"
+      ]
+    },
+    {
+      "test_name": "Seed Data API",
+      "success": true,
+      "response_time_ms": 41.87,
+      "status_code": 200,
+      "details": "Status: 200, Message: Sample data seeded successfully",
+      "timestamp": "2026-01-22T12:16:26.157145",
+      "response_data": {
+        "message": "Sample data seeded successfully"
+      }
+    },
+    {
+      "test_name": "Auth Protection - Wishes List",
+      "success": true,
+      "response_time_ms": 40.04,
+      "status_code": null,
+      "details": "Status: 401 (Protected)",
+      "timestamp": "2026-01-22T12:16:26.197824",
+      "response_data": null
+    },
+    {
+      "test_name": "Auth Protection - Create Wish",
+      "success": true,
+      "response_time_ms": 33.41,
+      "status_code": null,
+      "details": "Status: 401 (Protected)",
+      "timestamp": "2026-01-22T12:16:26.231893",
+      "response_data": null
+    },
+    {
+      "test_name": "Auth Protection - Chat Rooms",
+      "success": true,
+      "response_time_ms": 44.41,
+      "status_code": null,
+      "details": "Status: 401 (Protected)",
+      "timestamp": "2026-01-22T12:16:26.276960",
+      "response_data": null
+    },
+    {
+      "test_name": "Auth Protection - User Profile",
+      "success": true,
+      "response_time_ms": 40.76,
+      "status_code": null,
+      "details": "Status: 401 (Protected)",
+      "timestamp": "2026-01-22T12:16:26.318440",
+      "response_data": null
+    },
+    {
+      "test_name": "Auth Protection - Update Profile",
+      "success": false,
+      "response_time_ms": 76.31,
+      "status_code": null,
+      "details": "Status: 404 (Not Protected)",
+      "timestamp": "2026-01-22T12:16:26.395429",
+      "response_data": null
+    },
+    {
+      "test_name": "Create Wish",
+      "success": true,
+      "response_time_ms": 41.05,
+      "status_code": 401,
+      "details": "Status: 401 (Expected 401 without real auth)",
+      "timestamp": "2026-01-22T12:16:26.437273",
+      "response_data": null
+    },
+    {
+      "test_name": "List Wishes",
+      "success": true,
+      "response_time_ms": 35.41,
+      "status_code": null,
+      "details": "Status: 401 (Expected 401 without real auth)",
+      "timestamp": "2026-01-22T12:16:26.473364",
+      "response_data": null
+    },
+    {
+      "test_name": "Update Wish",
+      "success": true,
+      "response_time_ms": 78.61,
+      "status_code": null,
+      "details": "Status: 401 (Expected 401 without real auth)",
+      "timestamp": "2026-01-22T12:16:26.552637",
+      "response_data": null
+    },
+    {
+      "test_name": "Delete Wish",
+      "success": true,
+      "response_time_ms": 38.01,
+      "status_code": null,
+      "details": "Status: 401 (Expected 401 without real auth)",
+      "timestamp": "2026-01-22T12:16:26.591319",
+      "response_data": null
+    },
+    {
+      "test_name": "Seed Chat Data",
+      "success": true,
+      "response_time_ms": 37.19,
+      "status_code": null,
+      "details": "Status: 401 (Expected 401 without real auth)",
+      "timestamp": "2026-01-22T12:16:26.629225",
+      "response_data": null
+    },
+    {
+      "test_name": "List Chat Rooms",
+      "success": true,
+      "response_time_ms": 39.8,
+      "status_code": null,
+      "details": "Status: 401 (Expected 401 without real auth)",
+      "timestamp": "2026-01-22T12:16:26.669671",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Messages",
+      "success": true,
+      "response_time_ms": 36.01,
+      "status_code": null,
+      "details": "Status: 401 (Expected 401 without real auth)",
+      "timestamp": "2026-01-22T12:16:26.706293",
+      "response_data": null
+    },
+    {
+      "test_name": "Send Message",
+      "success": true,
+      "response_time_ms": 36.97,
+      "status_code": null,
+      "details": "Status: 401 (Expected 401 without real auth)",
+      "timestamp": "2026-01-22T12:16:26.744257",
+      "response_data": null
+    },
+    {
+      "test_name": "Approve Deal",
+      "success": true,
+      "response_time_ms": 35.52,
+      "status_code": null,
+      "details": "Status: 401 (Expected 401 without real auth)",
+      "timestamp": "2026-01-22T12:16:26.780445",
+      "response_data": null
+    },
+    {
+      "test_name": "Get Current User",
+      "success": false,
+      "response_time_ms": 38.31,
+      "status_code": null,
+      "details": "Status: 404 (Expected 401 without real auth)",
+      "timestamp": "2026-01-22T12:16:26.819511",
+      "response_data": null
+    },
+    {
+      "test_name": "Update Profile",
+      "success": false,
+      "response_time_ms": 41.39,
+      "status_code": null,
+      "details": "Status: 404 (Expected 401 without real auth)",
+      "timestamp": "2026-01-22T12:16:26.861623",
+      "response_data": null
+    },
+    {
+      "test_name": "Concurrent Performance Test",
+      "success": true,
+      "response_time_ms": 1454.81,
+      "status_code": 200,
+      "details": "Completed 20/20 requests (100.0% success) in 1.45s. Avg: 683ms, Max: 787ms",
+      "timestamp": "2026-01-22T12:16:28.317065",
+      "response_data": {
+        "total_requests": 20,
+        "successful_requests": 20,
+        "success_rate": "100.0%",
+        "total_time_seconds": 1.45,
+        "avg_response_time_ms": 683.47,
+        "max_response_time_ms": 786.53,
+        "min_response_time_ms": 503.57
+      }
+    }
+  ]
+}
