@@ -1,67 +1,20 @@
-import React, { useEffect, useRef, useMemo } from 'react';
-import { Tabs, useRouter, usePathname } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform, StyleSheet, View, PanResponder } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../_layout';
-
-const TAB_ROUTES = ['home', 'explore', 'chat', 'localhub', 'account'];
-const SWIPE_THRESHOLD = 50;
 
 export default function MainLayout() {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  
-  // Use ref to track current index to avoid stale closure
-  const currentIndexRef = useRef(0);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace('/');
     }
   }, [isAuthenticated, isLoading]);
-
-  // Update current index ref based on pathname
-  useEffect(() => {
-    const pathParts = pathname.split('/');
-    const route = pathParts[pathParts.length - 1] || 'home';
-    const index = TAB_ROUTES.indexOf(route);
-    if (index !== -1) {
-      currentIndexRef.current = index;
-      console.log('Tab changed to:', route, 'index:', index);
-    }
-  }, [pathname]);
-
-  // Create panResponder with useMemo so it recreates when router changes
-  const panResponder = useMemo(() => {
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only respond to horizontal swipes with significant movement
-        const isHorizontalSwipe = Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dy) < 50;
-        return isHorizontalSwipe;
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        // Read current index from ref (always up to date)
-        const currentIndex = currentIndexRef.current;
-        console.log('Swipe detected, dx:', gestureState.dx, 'currentIndex:', currentIndex);
-        
-        if (gestureState.dx > SWIPE_THRESHOLD && currentIndex > 0) {
-          // Swipe right - go to previous tab
-          const newIndex = currentIndex - 1;
-          console.log('Navigating to previous tab:', TAB_ROUTES[newIndex]);
-          router.push(`/(main)/${TAB_ROUTES[newIndex]}`);
-        } else if (gestureState.dx < -SWIPE_THRESHOLD && currentIndex < TAB_ROUTES.length - 1) {
-          // Swipe left - go to next tab
-          const newIndex = currentIndex + 1;
-          console.log('Navigating to next tab:', TAB_ROUTES[newIndex]);
-          router.push(`/(main)/${TAB_ROUTES[newIndex]}`);
-        }
-      },
-    });
-  }, [router]);
 
   // Calculate proper bottom padding for different devices
   const bottomPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 10 : 0);
