@@ -162,12 +162,12 @@ export default function AccountScreen() {
         style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#7C3AED" />
         }
       >
         {/* Header Profile Card */}
         <LinearGradient
-          colors={['#10B981', '#059669']}
+          colors={['#7C3AED', '#9333EA']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.headerGradient}
@@ -222,29 +222,29 @@ export default function AccountScreen() {
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#D1FAE5' }]}>
-              <Ionicons name="cart" size={22} color="#10B981" />
+            <View style={[styles.statIcon, { backgroundColor: '#E8D9F4' }]}>
+              <Ionicons name="cart" size={22} color="#7C3AED" />
             </View>
             <Text style={styles.statValue}>{stats?.total_orders || 0}</Text>
             <Text style={styles.statLabel}>Orders</Text>
           </View>
           <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#FEF3C7' }]}>
+            <View style={[styles.statIcon, { backgroundColor: '#FCE9C6' }]}>
               <Ionicons name="sparkles" size={22} color="#F59E0B" />
             </View>
             <Text style={styles.statValue}>{stats?.total_wishes || 0}</Text>
             <Text style={styles.statLabel}>Wishes</Text>
           </View>
           <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#DBEAFE' }]}>
-              <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+            <View style={[styles.statIcon, { backgroundColor: '#D0E9F7' }]}>
+              <Ionicons name="checkmark-circle" size={22} color="#0EA5E9" />
             </View>
             <Text style={styles.statValue}>{stats?.completed_wishes || 0}</Text>
             <Text style={styles.statLabel}>Completed</Text>
           </View>
           <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#EDE9FE' }]}>
-              <Ionicons name="wallet" size={22} color="#8B5CF6" />
+            <View style={[styles.statIcon, { backgroundColor: '#E8D9F4' }]}>
+              <Ionicons name="wallet" size={22} color="#7C3AED" />
             </View>
             <Text style={styles.statValue}>₹{stats?.total_spent || 0}</Text>
             <Text style={styles.statLabel}>Spent</Text>
