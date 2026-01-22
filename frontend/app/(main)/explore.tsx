@@ -1,106 +1,169 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, Image, Dimensions, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 import Constants from 'expo-constants';
-import { LinearGradient } from 'expo-linear-gradient';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
                    'https://quickwish-3.preview.emergentagent.com';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-interface ExplorePost {
-  post_id: string;
-  title: string;
-  content: string;
-  post_type: string;
-  image?: string;
-  created_at: string;
-  likes?: number;
-  comments?: number;
-  author?: string;
-  badge?: string;
+// Creator Types
+type CreatorType = 'agent' | 'vendor' | 'promoter';
+
+interface Story {
+  id: string;
+  user_name: string;
+  user_image: string;
+  creator_type: CreatorType;
+  category: string;
+  is_live?: boolean;
+  has_unseen?: boolean;
+  image: string;
+  text?: string;
 }
 
-// Category filters for gamification feel
-const CATEGORIES = [
-  { id: 'all', label: 'All', icon: 'apps', color: '#6366F1' },
-  { id: 'milestone', label: '🏆 Milestones', icon: 'trophy', color: '#F59E0B' },
-  { id: 'event', label: '📅 Events', icon: 'calendar', color: '#3B82F6' },
-  { id: 'celebration', label: '🎉 Celebrations', icon: 'happy', color: '#EC4899' },
-  { id: 'news', label: '📰 News', icon: 'newspaper', color: '#10B981' },
+interface FeedPost {
+  id: string;
+  creator_type: CreatorType;
+  creator_name: string;
+  creator_image: string;
+  creator_category: string;
+  is_verified: boolean;
+  images: string[];
+  caption: string;
+  likes: number;
+  comments: number;
+  timestamp: string;
+  tags?: string[];
+  milestone?: string;
+  promo_link?: string;
+}
+
+// Sample Stories Data
+const STORIES: Story[] = [
+  { id: '1', user_name: 'Ramesh', user_image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', creator_type: 'agent', category: 'Bike Delivery', has_unseen: true, image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400', text: '🏆 1000th Delivery!' },
+  { id: '2', user_name: 'GreenMart', user_image: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=100', creator_type: 'vendor', category: 'Grocery', has_unseen: true, image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400', text: '🎉 50% Off Today!' },
+  { id: '3', user_name: 'TravelWithMe', user_image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', creator_type: 'promoter', category: 'Travel', has_unseen: true, image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400', text: '🚌 Weekend Trip Open!' },
+  { id: '4', user_name: 'CleanPro', user_image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', creator_type: 'agent', category: 'Home Cleaner', has_unseen: false, image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400', text: 'Deep Clean Special' },
+  { id: '5', user_name: 'BiryaniKing', user_image: 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=100', creator_type: 'vendor', category: 'Restaurant', has_unseen: true, image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400', text: '🍗 New Menu!' },
+  { id: '6', user_name: 'GardenGuru', user_image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', creator_type: 'agent', category: 'Gardener', has_unseen: false, image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400', text: 'Garden Tips' },
+  { id: '7', user_name: 'FitLife', user_image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=100', creator_type: 'promoter', category: 'Fitness', is_live: true, has_unseen: true, image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400', text: '🔴 LIVE Workout' },
 ];
 
-// Community stats for gamification
-const COMMUNITY_STATS = {
-  wishes_fulfilled: 1247,
-  active_helpers: 89,
-  happy_wishers: 456,
+// Sample Feed Posts
+const FEED_POSTS: FeedPost[] = [
+  {
+    id: 'p1',
+    creator_type: 'agent',
+    creator_name: 'Ramesh Kumar',
+    creator_image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
+    creator_category: 'Bike Delivery',
+    is_verified: true,
+    images: ['https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600', 'https://images.unsplash.com/photo-1526367790999-0150786686a2?w=600'],
+    caption: 'Just completed my 1000th delivery! 🎉 Thank you all for trusting me with your packages. From groceries to medicines, I\'ve delivered it all with care. Here\'s to the next 1000! 🚴‍♂️💨',
+    likes: 234,
+    comments: 45,
+    timestamp: '2h ago',
+    tags: ['#1000Deliveries', '#LocalHero', '#BikeDelivery'],
+    milestone: '🏆 1000 Deliveries',
+  },
+  {
+    id: 'p2',
+    creator_type: 'vendor',
+    creator_name: 'Fresh Mart Grocery',
+    creator_image: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=100',
+    creator_category: 'Grocery Store',
+    is_verified: true,
+    images: ['https://images.unsplash.com/photo-1542838132-92c53300491e?w=600'],
+    caption: '🍎 Fresh arrivals! Organic fruits and vegetables directly from local farms. Order now and get 20% off on your first purchase! Use code: FRESH20',
+    likes: 156,
+    comments: 23,
+    timestamp: '4h ago',
+    tags: ['#Organic', '#FreshProduce', '#LocalFarm'],
+  },
+  {
+    id: 'p3',
+    creator_type: 'promoter',
+    creator_name: 'Weekend Wanderers',
+    creator_image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100',
+    creator_category: 'Travel Organizer',
+    is_verified: false,
+    images: ['https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=600', 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=600', 'https://images.unsplash.com/photo-1530789253388-582c481c54b0?w=600'],
+    caption: '🚌 Weekend Trip Alert! This Saturday we\'re heading to Coorg - the Scotland of India! Mini bus trip with 12 seats available.\n\n✅ Pickup from city center\n✅ Breakfast included\n✅ Professional guide\n\nDM or book through QuickWish!',
+    likes: 89,
+    comments: 34,
+    timestamp: '6h ago',
+    tags: ['#WeekendTrip', '#Coorg', '#TravelWithUs'],
+    promo_link: 'Book Now',
+  },
+  {
+    id: 'p4',
+    creator_type: 'agent',
+    creator_name: 'SparkleClean Services',
+    creator_image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
+    creator_category: 'Home Cleaning',
+    is_verified: true,
+    images: ['https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'],
+    caption: 'Transform your space! ✨ Professional deep cleaning services now available. We handle everything from kitchen degreasing to bathroom sanitization.\n\nBook your slot today and get a free carpet steam clean!',
+    likes: 67,
+    comments: 12,
+    timestamp: '8h ago',
+    tags: ['#DeepCleaning', '#HomeServices', '#SparkleClean'],
+  },
+  {
+    id: 'p5',
+    creator_type: 'promoter',
+    creator_name: 'FitLife Studios',
+    creator_image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=100',
+    creator_category: 'Fitness Coach',
+    is_verified: true,
+    images: ['https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600', 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=600'],
+    caption: '💪 New Year, New You! Join our 30-day transformation challenge. Personal training sessions now available at your doorstep or through video calls.\n\nFirst session FREE for QuickWish users!',
+    likes: 198,
+    comments: 56,
+    timestamp: '1d ago',
+    tags: ['#FitnessChallenge', '#PersonalTrainer', '#HomeWorkout'],
+    promo_link: 'Join Challenge',
+  },
+];
+
+// Creator type configurations
+const CREATOR_CONFIG: Record<CreatorType, { label: string; color: string; bgColor: string; icon: string }> = {
+  agent: { label: 'Agent', color: '#10B981', bgColor: '#D1FAE5', icon: 'bicycle' },
+  vendor: { label: 'Vendor', color: '#3B82F6', bgColor: '#DBEAFE', icon: 'storefront' },
+  promoter: { label: 'Promoter', color: '#8B5CF6', bgColor: '#EDE9FE', icon: 'megaphone' },
 };
 
+// Category filters
+const CATEGORIES = [
+  { id: 'all', label: 'All', icon: 'grid' },
+  { id: 'agent', label: 'Agents', icon: 'bicycle' },
+  { id: 'vendor', label: 'Vendors', icon: 'storefront' },
+  { id: 'promoter', label: 'Promoters', icon: 'megaphone' },
+  { id: 'milestone', label: 'Milestones', icon: 'trophy' },
+  { id: 'deals', label: 'Deals', icon: 'pricetag' },
+];
+
 export default function ExploreScreen() {
-  const [posts, setPosts] = useState<ExplorePost[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const insets = useSafeAreaInsets();
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [posts, setPosts] = useState<FeedPost[]>(FEED_POSTS);
+  const [stories, setStories] = useState<Story[]>(STORIES);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
-  const [animatedValue] = useState(new Animated.Value(0));
-
-  const fetchPosts = useCallback(async () => {
-    try {
-      const response = await axios.get(`${BACKEND_URL}/api/explore`);
-      // Enhance posts with mock engagement data
-      const enhancedPosts = response.data.map((post: ExplorePost) => ({
-        ...post,
-        likes: Math.floor(Math.random() * 50) + 5,
-        comments: Math.floor(Math.random() * 15),
-        author: getRandomAuthor(),
-        badge: Math.random() > 0.7 ? getRandomBadge() : null,
-      }));
-      setPosts(enhancedPosts);
-    } catch (error) {
-      console.error('Error fetching explore posts:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const getRandomAuthor = () => {
-    const authors = ['Community Team', 'Local Hero', 'QuickWish', 'Neighborhood Watch', 'Helper Network'];
-    return authors[Math.floor(Math.random() * authors.length)];
-  };
-
-  const getRandomBadge = () => {
-    const badges = ['🔥 Hot', '⭐ Featured', '💎 Premium', '🌟 Popular'];
-    return badges[Math.floor(Math.random() * badges.length)];
-  };
-
-  const seedData = async () => {
-    try {
-      setIsLoading(true);
-      await axios.post(`${BACKEND_URL}/api/seed`);
-      await fetchPosts();
-    } catch (error) {
-      console.error('Error seeding data:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchPosts();
-    // Animate stats on mount
-    Animated.timing(animatedValue, {
-      toValue: 1,
-      duration: 1000,
-      useNativeDriver: true,
-    }).start();
-  }, [fetchPosts]);
+  const [selectedStory, setSelectedStory] = useState<Story | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState<Record<string, number>>({});
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchPosts();
+    // Simulate refresh
+    await new Promise(resolve => setTimeout(resolve, 1000));
     setRefreshing(false);
   };
 
@@ -116,262 +179,357 @@ export default function ExploreScreen() {
     });
   };
 
-  const getPostTypeConfig = (type: string) => {
-    switch (type) {
-      case 'milestone':
-        return { icon: 'trophy', color: '#F59E0B', bg: '#FEF3C7', emoji: '🏆' };
-      case 'event':
-        return { icon: 'calendar', color: '#3B82F6', bg: '#DBEAFE', emoji: '📅' };
-      case 'celebration':
-        return { icon: 'happy', color: '#EC4899', bg: '#FCE7F3', emoji: '🎉' };
-      case 'news':
-        return { icon: 'newspaper', color: '#10B981', bg: '#D1FAE5', emoji: '📰' };
-      default:
-        return { icon: 'information-circle', color: '#6B7280', bg: '#F3F4F6', emoji: '📌' };
-    }
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    
-    if (hours < 1) return 'Just now';
-    if (hours < 24) return `${hours}h ago`;
-    if (hours < 48) return 'Yesterday';
-    return date.toLocaleDateString();
-  };
-
   const filteredPosts = selectedCategory === 'all' 
     ? posts 
-    : posts.filter(p => p.post_type === selectedCategory);
+    : selectedCategory === 'milestone'
+    ? posts.filter(p => p.milestone)
+    : selectedCategory === 'deals'
+    ? posts.filter(p => p.promo_link)
+    : posts.filter(p => p.creator_type === selectedCategory);
 
-  const StatCard = ({ icon, value, label, color }: { icon: string; value: number; label: string; color: string }) => (
-    <View style={[styles.statCard, { borderColor: color + '30' }]}>
-      <View style={[styles.statIconContainer, { backgroundColor: color + '20' }]}>
-        <Ionicons name={icon as any} size={20} color={color} />
-      </View>
-      <Text style={[styles.statValue, { color }]}>{value.toLocaleString()}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
+  const nextImage = (postId: string, totalImages: number) => {
+    setCurrentImageIndex(prev => ({
+      ...prev,
+      [postId]: ((prev[postId] || 0) + 1) % totalImages
+    }));
+  };
+
+  const prevImage = (postId: string, totalImages: number) => {
+    setCurrentImageIndex(prev => ({
+      ...prev,
+      [postId]: ((prev[postId] || 0) - 1 + totalImages) % totalImages
+    }));
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header with gradient */}
-      <View style={styles.headerWrapper}>
-        <LinearGradient
-          colors={['#6366F1', '#8B5CF6']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.headerGradient}
-        >
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.headerTitle}>Explore</Text>
-              <Text style={styles.headerSubtitle}>What's happening nearby</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Explore</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.headerButton}>
+            <Ionicons name="search" size={22} color="#1F2937" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerButton}>
+            <Ionicons name="notifications-outline" size={22} color="#1F2937" />
+            <View style={styles.notifBadge}>
+              <Text style={styles.notifBadgeText}>3</Text>
             </View>
-            <TouchableOpacity style={styles.notificationButton}>
-              <Ionicons name="notifications-outline" size={24} color="#fff" />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>3</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {/* Community Stats - Gamification */}
-          <View style={styles.statsContainer}>
-            <StatCard 
-              icon="checkmark-done-circle" 
-              value={COMMUNITY_STATS.wishes_fulfilled} 
-              label="Wishes Fulfilled" 
-              color="#10B981" 
-            />
-            <StatCard 
-              icon="people" 
-              value={COMMUNITY_STATS.active_helpers} 
-              label="Active Helpers" 
-              color="#F59E0B" 
-            />
-            <StatCard 
-              icon="heart" 
-              value={COMMUNITY_STATS.happy_wishers} 
-              label="Happy Wishers" 
-              color="#EC4899" 
-            />
-          </View>
-        </LinearGradient>
-      </View>
-
-      {/* Category Filter Pills */}
-      <View style={styles.categoryWrapper}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          contentContainerStyle={styles.categoryContainer}
-        >
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity
-              key={cat.id}
-              style={[
-                styles.categoryPill,
-                selectedCategory === cat.id && styles.categoryPillSelected,
-                selectedCategory === cat.id && { backgroundColor: cat.color }
-              ]}
-              onPress={() => setSelectedCategory(cat.id)}
-            >
-              <Text style={[
-                styles.categoryPillText,
-                selectedCategory === cat.id && styles.categoryPillTextSelected
-              ]}>
-                {cat.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366F1" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />
         }
       >
-        {isLoading ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color="#6366F1" />
-            <Text style={styles.loaderText}>Loading amazing stories...</Text>
-          </View>
-        ) : filteredPosts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyStateIconContainer}>
-              <Ionicons name="compass-outline" size={48} color="#6366F1" />
-            </View>
-            <Text style={styles.emptyStateTitle}>No updates yet</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Community highlights, events, and stories will appear here
-            </Text>
-            <TouchableOpacity style={styles.seedButton} onPress={seedData}>
-              <Ionicons name="sparkles" size={18} color="#fff" />
-              <Text style={styles.seedButtonText}>Discover Sample Content</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            {/* Featured Section */}
-            {selectedCategory === 'all' && posts.filter(p => p.badge).length > 0 && (
-              <View style={styles.featuredSection}>
-                <Text style={styles.sectionTitle}>✨ Featured Stories</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {posts.filter(p => p.badge).slice(0, 3).map((post) => {
-                    const config = getPostTypeConfig(post.post_type);
-                    return (
-                      <TouchableOpacity key={`featured-${post.post_id}`} style={styles.featuredCard}>
-                        <LinearGradient
-                          colors={[config.color, config.color + 'CC']}
-                          style={styles.featuredGradient}
-                        >
-                          <Text style={styles.featuredBadge}>{post.badge}</Text>
-                          <Text style={styles.featuredTitle} numberOfLines={2}>{post.title}</Text>
-                          <View style={styles.featuredMeta}>
-                            <Ionicons name={config.icon as any} size={14} color="#fff" />
-                            <Text style={styles.featuredType}>
-                              {post.post_type.charAt(0).toUpperCase() + post.post_type.slice(1)}
-                            </Text>
-                          </View>
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+        {/* Stories Section */}
+        <View style={styles.storiesSection}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.storiesContainer}
+          >
+            {/* Your Story */}
+            <TouchableOpacity style={styles.storyItem}>
+              <View style={styles.addStoryWrapper}>
+                <LinearGradient
+                  colors={['#10B981', '#059669']}
+                  style={styles.addStoryGradient}
+                >
+                  <Ionicons name="add" size={28} color="#fff" />
+                </LinearGradient>
               </View>
-            )}
+              <Text style={styles.storyName}>Add Story</Text>
+            </TouchableOpacity>
 
-            {/* Posts List */}
-            <View style={styles.postsSection}>
-              <Text style={styles.sectionTitle}>📋 Latest Updates</Text>
-              {filteredPosts.map((post) => {
-                const config = getPostTypeConfig(post.post_type);
-                const isLiked = likedPosts.has(post.post_id);
-                
-                return (
-                  <TouchableOpacity 
-                    key={post.post_id} 
-                    style={styles.postCard}
-                    activeOpacity={0.9}
-                  >
-                    {/* Post Header */}
-                    <View style={styles.postHeader}>
-                      <View style={[styles.postTypeIcon, { backgroundColor: config.bg }]}>
-                        <Text style={styles.postTypeEmoji}>{config.emoji}</Text>
+            {/* Other Stories */}
+            {stories.map((story) => {
+              const config = CREATOR_CONFIG[story.creator_type];
+              return (
+                <TouchableOpacity 
+                  key={story.id} 
+                  style={styles.storyItem}
+                  onPress={() => setSelectedStory(story)}
+                >
+                  <View style={[
+                    styles.storyRing,
+                    story.has_unseen && { borderColor: config.color },
+                    story.is_live && styles.storyRingLive
+                  ]}>
+                    <Image source={{ uri: story.user_image }} style={styles.storyAvatar} />
+                    {story.is_live && (
+                      <View style={styles.liveBadge}>
+                        <Text style={styles.liveBadgeText}>LIVE</Text>
                       </View>
-                      <View style={styles.postMeta}>
-                        <View style={styles.postMetaTop}>
-                          <Text style={[styles.postType, { color: config.color }]}>
-                            {post.post_type.charAt(0).toUpperCase() + post.post_type.slice(1)}
-                          </Text>
-                          {post.badge && (
-                            <View style={[styles.postBadge, { backgroundColor: config.color + '20' }]}>
-                              <Text style={[styles.postBadgeText, { color: config.color }]}>{post.badge}</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={styles.postAuthor}>by {post.author}</Text>
-                      </View>
-                      <Text style={styles.postTime}>{formatDate(post.created_at)}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.storyName} numberOfLines={1}>{story.user_name}</Text>
+                  <View style={[styles.storyTypeBadge, { backgroundColor: config.bgColor }]}>
+                    <Ionicons name={config.icon as any} size={8} color={config.color} />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Category Filter */}
+        <View style={styles.categorySection}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryContainer}
+          >
+            {CATEGORIES.map((cat) => {
+              const isSelected = selectedCategory === cat.id;
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[styles.categoryPill, isSelected && styles.categoryPillSelected]}
+                  onPress={() => setSelectedCategory(cat.id)}
+                >
+                  <Ionicons 
+                    name={cat.icon as any} 
+                    size={14} 
+                    color={isSelected ? '#fff' : '#6B7280'} 
+                  />
+                  <Text style={[styles.categoryText, isSelected && styles.categoryTextSelected]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Feed Posts */}
+        <View style={styles.feedSection}>
+          {filteredPosts.map((post) => {
+            const config = CREATOR_CONFIG[post.creator_type];
+            const isLiked = likedPosts.has(post.id);
+            const currentImg = currentImageIndex[post.id] || 0;
+
+            return (
+              <View key={post.id} style={styles.postCard}>
+                {/* Post Header */}
+                <View style={styles.postHeader}>
+                  <TouchableOpacity style={styles.postCreatorInfo}>
+                    <View style={[styles.creatorAvatarWrapper, { borderColor: config.color }]}>
+                      <Image source={{ uri: post.creator_image }} style={styles.creatorAvatar} />
                     </View>
-
-                    {/* Post Content */}
-                    <Text style={styles.postTitle}>{post.title}</Text>
-                    <Text style={styles.postContent} numberOfLines={3}>{post.content}</Text>
-
-                    {/* Engagement Bar */}
-                    <View style={styles.engagementBar}>
-                      <TouchableOpacity 
-                        style={[styles.engagementButton, isLiked && styles.engagementButtonActive]}
-                        onPress={() => toggleLike(post.post_id)}
-                      >
-                        <Ionicons 
-                          name={isLiked ? "heart" : "heart-outline"} 
-                          size={20} 
-                          color={isLiked ? "#EF4444" : "#6B7280"} 
-                        />
-                        <Text style={[styles.engagementText, isLiked && styles.engagementTextActive]}>
-                          {(post.likes || 0) + (isLiked ? 1 : 0)}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity style={styles.engagementButton}>
-                        <Ionicons name="chatbubble-outline" size={18} color="#6B7280" />
-                        <Text style={styles.engagementText}>{post.comments || 0}</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity style={styles.engagementButton}>
-                        <Ionicons name="share-social-outline" size={18} color="#6B7280" />
-                        <Text style={styles.engagementText}>Share</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity style={styles.bookmarkButton}>
-                        <Ionicons name="bookmark-outline" size={18} color="#6B7280" />
-                      </TouchableOpacity>
+                    <View style={styles.creatorDetails}>
+                      <View style={styles.creatorNameRow}>
+                        <Text style={styles.creatorName}>{post.creator_name}</Text>
+                        {post.is_verified && (
+                          <Ionicons name="checkmark-circle" size={14} color="#3B82F6" />
+                        )}
+                      </View>
+                      <View style={styles.creatorMeta}>
+                        <View style={[styles.creatorTypeBadge, { backgroundColor: config.bgColor }]}>
+                          <Ionicons name={config.icon as any} size={10} color={config.color} />
+                          <Text style={[styles.creatorTypeText, { color: config.color }]}>
+                            {config.label}
+                          </Text>
+                        </View>
+                        <Text style={styles.creatorCategory}>• {post.creator_category}</Text>
+                      </View>
                     </View>
                   </TouchableOpacity>
-                );
-              })}
-            </View>
-          </>
-        )}
-        
-        {/* Bottom spacing for tab bar */}
+                  <TouchableOpacity style={styles.moreButton}>
+                    <Ionicons name="ellipsis-horizontal" size={20} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Milestone Badge */}
+                {post.milestone && (
+                  <View style={styles.milestoneBanner}>
+                    <LinearGradient
+                      colors={['#F59E0B', '#D97706']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.milestoneGradient}
+                    >
+                      <Ionicons name="trophy" size={16} color="#fff" />
+                      <Text style={styles.milestoneText}>{post.milestone}</Text>
+                    </LinearGradient>
+                  </View>
+                )}
+
+                {/* Post Images */}
+                <View style={styles.postImageContainer}>
+                  <Image 
+                    source={{ uri: post.images[currentImg] }} 
+                    style={styles.postImage}
+                    resizeMode="cover"
+                  />
+                  
+                  {/* Image Navigation */}
+                  {post.images.length > 1 && (
+                    <>
+                      <TouchableOpacity 
+                        style={[styles.imageNav, styles.imageNavLeft]}
+                        onPress={() => prevImage(post.id, post.images.length)}
+                      >
+                        <Ionicons name="chevron-back" size={24} color="#fff" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.imageNav, styles.imageNavRight]}
+                        onPress={() => nextImage(post.id, post.images.length)}
+                      >
+                        <Ionicons name="chevron-forward" size={24} color="#fff" />
+                      </TouchableOpacity>
+                      
+                      {/* Image Indicators */}
+                      <View style={styles.imageIndicators}>
+                        {post.images.map((_, idx) => (
+                          <View 
+                            key={idx}
+                            style={[styles.imageIndicator, currentImg === idx && styles.imageIndicatorActive]}
+                          />
+                        ))}
+                      </View>
+                    </>
+                  )}
+
+                  {/* Image Count Badge */}
+                  {post.images.length > 1 && (
+                    <View style={styles.imageCountBadge}>
+                      <Text style={styles.imageCountText}>{currentImg + 1}/{post.images.length}</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Action Bar */}
+                <View style={styles.actionBar}>
+                  <View style={styles.actionLeft}>
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => toggleLike(post.id)}
+                    >
+                      <Ionicons 
+                        name={isLiked ? "heart" : "heart-outline"} 
+                        size={26} 
+                        color={isLiked ? "#EF4444" : "#1F2937"} 
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton}>
+                      <Ionicons name="chatbubble-outline" size={24} color="#1F2937" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionButton}>
+                      <Ionicons name="paper-plane-outline" size={24} color="#1F2937" />
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity style={styles.actionButton}>
+                    <Ionicons name="bookmark-outline" size={24} color="#1F2937" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Likes */}
+                <Text style={styles.likesText}>
+                  {post.likes + (isLiked ? 1 : 0)} likes
+                </Text>
+
+                {/* Caption */}
+                <View style={styles.captionContainer}>
+                  <Text style={styles.captionText}>
+                    <Text style={styles.captionUsername}>{post.creator_name} </Text>
+                    {post.caption}
+                  </Text>
+                </View>
+
+                {/* Tags */}
+                {post.tags && (
+                  <View style={styles.tagsContainer}>
+                    {post.tags.map((tag, idx) => (
+                      <TouchableOpacity key={idx}>
+                        <Text style={styles.tagText}>{tag}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Promo Link */}
+                {post.promo_link && (
+                  <TouchableOpacity style={styles.promoButton}>
+                    <Text style={styles.promoButtonText}>{post.promo_link}</Text>
+                    <Ionicons name="arrow-forward" size={16} color="#fff" />
+                  </TouchableOpacity>
+                )}
+
+                {/* Comments Preview */}
+                <TouchableOpacity>
+                  <Text style={styles.viewComments}>View all {post.comments} comments</Text>
+                </TouchableOpacity>
+
+                {/* Timestamp */}
+                <Text style={styles.timestamp}>{post.timestamp}</Text>
+              </View>
+            );
+          })}
+        </View>
+
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      {/* Floating Action Button for posting */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
+      {/* Story Viewer Modal */}
+      <Modal visible={!!selectedStory} animationType="fade" transparent>
+        {selectedStory && (
+          <View style={styles.storyModal}>
+            <Image 
+              source={{ uri: selectedStory.image }} 
+              style={styles.storyFullImage}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={['rgba(0,0,0,0.6)', 'transparent', 'transparent', 'rgba(0,0,0,0.6)']}
+              style={styles.storyOverlay}
+            >
+              {/* Story Header */}
+              <View style={[styles.storyHeader, { paddingTop: insets.top + 10 }]}>
+                <View style={styles.storyProgress}>
+                  <View style={styles.storyProgressFill} />
+                </View>
+                <View style={styles.storyUserInfo}>
+                  <Image source={{ uri: selectedStory.user_image }} style={styles.storyUserAvatar} />
+                  <View>
+                    <Text style={styles.storyUsername}>{selectedStory.user_name}</Text>
+                    <Text style={styles.storyCategory}>{selectedStory.category}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setSelectedStory(null)}>
+                  <Ionicons name="close" size={28} color="#fff" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Story Text */}
+              {selectedStory.text && (
+                <View style={styles.storyTextContainer}>
+                  <Text style={styles.storyText}>{selectedStory.text}</Text>
+                </View>
+              )}
+
+              {/* Story Actions */}
+              <View style={[styles.storyActions, { paddingBottom: insets.bottom + 20 }]}>
+                <TouchableOpacity style={styles.storyActionButton}>
+                  <Ionicons name="heart-outline" size={28} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.storyActionButton}>
+                  <Ionicons name="paper-plane-outline" size={26} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+          </View>
+        )}
+      </Modal>
+
+      {/* Floating Create Button */}
+      <TouchableOpacity style={[styles.fab, { bottom: 90 + insets.bottom }]}>
         <LinearGradient
-          colors={['#6366F1', '#8B5CF6']}
+          colors={['#10B981', '#059669']}
           style={styles.fabGradient}
         >
           <Ionicons name="add" size={28} color="#fff" />
@@ -384,326 +542,488 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
-  },
-  headerWrapper: {
-    overflow: 'hidden',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-  },
-  headerGradient: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 20,
+    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 2,
-  },
-  notificationButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
     alignItems: 'center',
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#EF4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notificationBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-    gap: 10,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  statIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  statLabel: {
-    fontSize: 10,
-    color: '#6B7280',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  categoryWrapper: {
-    backgroundColor: '#fff',
+    paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#F3F4F6',
   },
-  categoryContainer: {
-    paddingHorizontal: 16,
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  headerActions: {
+    flexDirection: 'row',
     gap: 8,
   },
-  categoryPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  headerButton: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
     backgroundColor: '#F3F4F6',
-    marginRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
   },
-  categoryPillSelected: {
-    backgroundColor: '#6366F1',
+  notifBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: '#EF4444',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  categoryPillText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#4B5563',
-  },
-  categoryPillTextSelected: {
+  notifBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
     color: '#fff',
   },
   content: {
     flex: 1,
   },
-  loaderContainer: {
+  
+  // Stories Section
+  storiesSection: {
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  storiesContainer: {
+    paddingHorizontal: 12,
+  },
+  storyItem: {
     alignItems: 'center',
-    paddingVertical: 60,
+    marginHorizontal: 6,
+    width: 70,
+    position: 'relative',
   },
-  loaderText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#6B7280',
+  addStoryWrapper: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    overflow: 'hidden',
   },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
-  },
-  emptyStateIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#EEF2FF',
+  addStoryGradient: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
   },
-  emptyStateTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  seedButton: {
-    flexDirection: 'row',
+  storyRing: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 3,
+    borderColor: '#E5E7EB',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 24,
-    backgroundColor: '#6366F1',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
   },
-  seedButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 15,
+  storyRingLive: {
+    borderColor: '#EF4444',
   },
-  featuredSection: {
-    paddingTop: 16,
-    paddingBottom: 8,
+  storyAvatar: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
   },
-  sectionTitle: {
-    fontSize: 18,
+  liveBadge: {
+    position: 'absolute',
+    bottom: -2,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  liveBadgeText: {
+    fontSize: 8,
     fontWeight: '700',
-    color: '#1F2937',
-    paddingHorizontal: 20,
-    marginBottom: 12,
+    color: '#fff',
   },
-  featuredCard: {
-    width: width * 0.65,
-    height: 140,
-    marginLeft: 20,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  featuredGradient: {
-    flex: 1,
-    padding: 16,
-    justifyContent: 'space-between',
-  },
-  featuredBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+  storyName: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#fff',
-    overflow: 'hidden',
+    color: '#4B5563',
+    marginTop: 4,
+    textAlign: 'center',
   },
-  featuredTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-    lineHeight: 22,
+  storyTypeBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
-  featuredMeta: {
+  
+  // Category Filter
+  categorySection: {
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+  },
+  categoryContainer: {
+    paddingHorizontal: 12,
+  },
+  categoryPill: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
+    marginRight: 8,
     gap: 6,
   },
-  featuredType: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: '500',
+  categoryPillSelected: {
+    backgroundColor: '#10B981',
   },
-  postsSection: {
-    paddingTop: 16,
+  categoryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  categoryTextSelected: {
+    color: '#fff',
+  },
+  
+  // Feed Section
+  feedSection: {
+    paddingTop: 8,
   },
   postCard: {
     backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    marginBottom: 16,
   },
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  postTypeIcon: {
+  postCreatorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  creatorAvatarWrapper: {
     width: 44,
     height: 44,
-    borderRadius: 12,
+    borderRadius: 22,
+    borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  postTypeEmoji: {
-    fontSize: 22,
+  creatorAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
-  postMeta: {
+  creatorDetails: {
+    marginLeft: 10,
     flex: 1,
-    marginLeft: 12,
   },
-  postMetaTop: {
+  creatorNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
-  postType: {
+  creatorName: {
     fontSize: 14,
     fontWeight: '700',
+    color: '#1F2937',
   },
-  postBadge: {
-    paddingHorizontal: 8,
+  creatorMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    gap: 4,
+  },
+  creatorTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
+    gap: 3,
   },
-  postBadgeText: {
+  creatorTypeText: {
     fontSize: 10,
     fontWeight: '600',
   },
-  postAuthor: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 2,
-  },
-  postTime: {
+  creatorCategory: {
     fontSize: 11,
     color: '#9CA3AF',
   },
-  postTitle: {
-    fontSize: 17,
+  moreButton: {
+    padding: 4,
+  },
+  
+  // Milestone Banner
+  milestoneBanner: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  milestoneGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    gap: 8,
+  },
+  milestoneText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  
+  // Post Image
+  postImageContainer: {
+    width: '100%',
+    height: SCREEN_WIDTH,
+    backgroundColor: '#F3F4F6',
+    position: 'relative',
+  },
+  postImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageNav: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageNavLeft: {
+    left: 10,
+  },
+  imageNavRight: {
+    right: 10,
+  },
+  imageIndicators: {
+    position: 'absolute',
+    bottom: 12,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  imageIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  imageIndicatorActive: {
+    backgroundColor: '#fff',
+    width: 16,
+  },
+  imageCountBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  imageCountText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  
+  // Action Bar
+  actionBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  actionLeft: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    padding: 4,
+  },
+  likesText: {
+    fontSize: 14,
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 8,
-    lineHeight: 24,
+    paddingHorizontal: 16,
   },
-  postContent: {
+  
+  // Caption
+  captionContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 6,
+  },
+  captionText: {
     fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 21,
-    marginBottom: 12,
+    color: '#4B5563',
+    lineHeight: 20,
   },
-  engagementBar: {
+  captionUsername: {
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  
+  // Tags
+  tagsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    gap: 16,
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    gap: 8,
   },
-  engagementButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  engagementButtonActive: {},
-  engagementText: {
+  tagText: {
     fontSize: 13,
-    color: '#6B7280',
+    color: '#3B82F6',
     fontWeight: '500',
   },
-  engagementTextActive: {
-    color: '#EF4444',
+  
+  // Promo Button
+  promoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
   },
-  bookmarkButton: {
-    marginLeft: 'auto',
+  promoButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
   },
+  
+  // Comments
+  viewComments: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  timestamp: {
+    fontSize: 11,
+    color: '#D1D5DB',
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 12,
+  },
+  
+  // Story Modal
+  storyModal: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  storyFullImage: {
+    flex: 1,
+  },
+  storyOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'space-between',
+  },
+  storyHeader: {
+    paddingHorizontal: 16,
+  },
+  storyProgress: {
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 1,
+    marginBottom: 12,
+  },
+  storyProgressFill: {
+    width: '50%',
+    height: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 1,
+  },
+  storyUserInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  storyUserAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  storyUsername: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  storyCategory: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  storyTextContainer: {
+    position: 'absolute',
+    bottom: '25%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  storyText: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#fff',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  storyActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 20,
+  },
+  storyActionButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // FAB
   fab: {
     position: 'absolute',
-    bottom: 90,
     right: 20,
     borderRadius: 28,
     overflow: 'hidden',
-    shadowColor: '#6366F1',
+    shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -715,6 +1035,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  
   bottomPadding: {
     height: 100,
   },
