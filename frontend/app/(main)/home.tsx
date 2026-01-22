@@ -386,7 +386,7 @@ export default function HomeScreen() {
           <Text style={styles.swipeHintText}>Swipe left or right to switch tabs</Text>
         </View>
         
-        <View style={{ height: 20 }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );
