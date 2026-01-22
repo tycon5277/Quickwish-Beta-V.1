@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 10,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#E8D9F4',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
   wishCardTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#212529',
     marginBottom: 4,
   },
   wishCardMeta: {
@@ -635,7 +635,7 @@ const styles = StyleSheet.create({
   remunerationText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#10B981',
+    color: '#7C3AED',
     marginLeft: 12,
   },
   wishActions: {
