@@ -182,8 +182,11 @@ export default function LocationPickerScreen() {
 
   // Generate Leaflet HTML for the map
   const getMapHTML = () => {
-    const lat = pinLocation?.lat || currentGPSLocation?.lat || 28.6139;
-    const lng = pinLocation?.lng || currentGPSLocation?.lng || 77.2090;
+    const pinLat = pinLocation?.lat || currentGPSLocation?.lat || 28.6139;
+    const pinLng = pinLocation?.lng || currentGPSLocation?.lng || 77.2090;
+    const gpsLat = currentGPSLocation?.lat || 28.6139;
+    const gpsLng = currentGPSLocation?.lng || 77.2090;
+    const hasGPS = currentGPSLocation !== null;
     
     return `
       <!DOCTYPE html>
@@ -195,7 +198,7 @@ export default function LocationPickerScreen() {
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           html, body, #map { width: 100%; height: 100%; }
-          .custom-marker {
+          .custom-marker, .gps-marker {
             background: none;
             border: none;
           }
@@ -209,15 +212,110 @@ export default function LocationPickerScreen() {
             height: 100%;
             filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
           }
+          .gps-dot {
+            width: 20px;
+            height: 20px;
+            position: relative;
+          }
+          .gps-pulse {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(99, 102, 241, 0.2);
+            top: -10px;
+            left: -10px;
+            animation: pulse 2s ease-out infinite;
+          }
+          .gps-center {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #6366F1;
+            border: 3px solid white;
+            top: 3px;
+            left: 3px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          }
+          @keyframes pulse {
+            0% { transform: scale(0.5); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+          }
+          .locate-btn {
+            position: absolute;
+            bottom: 16px;
+            right: 16px;
+            width: 44px;
+            height: 44px;
+            background: white;
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+          }
+          .locate-btn:active {
+            background: #F3F4F6;
+          }
+          .locate-btn svg {
+            width: 24px;
+            height: 24px;
+          }
+          .zoom-controls {
+            position: absolute;
+            bottom: 70px;
+            right: 16px;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+          }
+          .zoom-btn {
+            width: 44px;
+            height: 44px;
+            background: white;
+            border: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: #374151;
+          }
+          .zoom-btn:first-child {
+            border-radius: 12px 12px 0 0;
+            border-bottom: 1px solid #E5E7EB;
+          }
+          .zoom-btn:last-child {
+            border-radius: 0 0 12px 12px;
+          }
+          .zoom-btn:active {
+            background: #F3F4F6;
+          }
         </style>
       </head>
       <body>
         <div id="map"></div>
+        <div class="zoom-controls">
+          <button class="zoom-btn" onclick="map.zoomIn()">+</button>
+          <button class="zoom-btn" onclick="map.zoomOut()">−</button>
+        </div>
+        <button class="locate-btn" onclick="locateMe()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+          </svg>
+        </button>
         <script>
           var map = L.map('map', {
             zoomControl: false,
             attributionControl: false
-          }).setView([${lat}, ${lng}], 15);
+          }).setView([${pinLat}, ${pinLng}], 15);
           
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
