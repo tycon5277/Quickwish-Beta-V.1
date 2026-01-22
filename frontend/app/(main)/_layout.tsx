@@ -25,25 +25,25 @@ export default function MainLayout() {
         screenOptions={{
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: '#fff',
-            borderTopWidth: 1,
-            borderTopColor: '#F3F4F6',
-            paddingTop: 8,
+            backgroundColor: '#2D3436',
+            borderTopWidth: 0,
+            paddingTop: 10,
             paddingBottom: bottomPadding + 8,
-            height: 60 + bottomPadding,
+            height: 65 + bottomPadding,
             position: 'absolute',
             bottom: 0,
             left: 0,
             right: 0,
-            elevation: 8,
+            elevation: 0,
+            shadowOpacity: 0,
           },
-          tabBarActiveTintColor: '#6366F1',
+          tabBarActiveTintColor: '#FBBF24',
           tabBarInactiveTintColor: '#9CA3AF',
           tabBarLabelStyle: styles.tabBarLabel,
           tabBarHideOnKeyboard: true,
         }}
         sceneContainerStyle={{
-          paddingBottom: 60 + bottomPadding,
+          paddingBottom: 65 + bottomPadding,
         }}
       >
         <Tabs.Screen
