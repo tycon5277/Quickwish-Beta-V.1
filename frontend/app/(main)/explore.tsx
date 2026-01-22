@@ -329,55 +329,76 @@ export default function ExploreScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />
         }
       >
-        {/* Stories Section - Distinctive Rounded Rectangle Shape */}
-        <View style={styles.storiesSection}>
-          <Text style={styles.sectionLabel}>HIGHLIGHTS</Text>
+        {/* Promoted Highlights Section - Large Content-First Tiles */}
+        <View style={styles.highlightsSection}>
+          <View style={styles.highlightsHeader}>
+            <Text style={styles.sectionLabel}>PROMOTED HIGHLIGHTS</Text>
+            <View style={styles.sponsoredTag}>
+              <Ionicons name="megaphone" size={10} color="#8B5CF6" />
+              <Text style={styles.sponsoredText}>Sponsored</Text>
+            </View>
+          </View>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.storiesContainer}
+            contentContainerStyle={styles.highlightsContainer}
+            decelerationRate="fast"
+            snapToInterval={SCREEN_WIDTH * 0.75 + 12}
           >
             {sortedStories.map((story) => {
               const config = CREATOR_CONFIG[story.creator_type];
               return (
                 <TouchableOpacity 
                   key={story.id} 
-                  style={styles.storyItem}
+                  style={styles.highlightCard}
                   onPress={() => openStory(story.id)}
-                  activeOpacity={0.8}
+                  activeOpacity={0.9}
                 >
-                  {/* Distinctive Rounded Rectangle Shape */}
-                  <View style={[
-                    styles.storyCardWrapper,
-                    !story.viewed && { borderColor: config.color }
-                  ]}>
-                    <LinearGradient
-                      colors={!story.viewed ? config.gradient as any : ['#E5E7EB', '#D1D5DB']}
-                      style={styles.storyGradientBorder}
-                    >
-                      <View style={styles.storyImageWrapper}>
-                        <Image source={{ uri: story.user_image }} style={styles.storyImage} />
-                        {/* Creator Type Icon */}
-                        <View style={[styles.storyTypeIcon, { backgroundColor: config.color }]}>
-                          <Ionicons name={config.icon as any} size={10} color="#fff" />
-                        </View>
-                      </View>
-                    </LinearGradient>
-                    {story.is_live && (
-                      <View style={styles.liveBadge}>
-                        <Text style={styles.liveBadgeText}>LIVE</Text>
-                      </View>
-                    )}
-                    {story.viewed && (
-                      <View style={styles.viewedOverlay}>
-                        <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                      </View>
-                    )}
-                  </View>
-                  <Text style={[styles.storyName, story.viewed && styles.storyNameViewed]} numberOfLines={1}>
-                    {story.user_name}
-                  </Text>
-                  <Text style={styles.storyCategory} numberOfLines={1}>{story.category}</Text>
+                  {/* Large Content Preview */}
+                  <Image source={{ uri: story.image }} style={styles.highlightImage} />
+                  
+                  {/* Gradient Overlay */}
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.85)']}
+                    style={styles.highlightOverlay}
+                  >
+                    {/* Creator Type Badge */}
+                    <View style={[styles.highlightTypeBadge, { backgroundColor: config.color }]}>
+                      <Ionicons name={config.icon as any} size={12} color="#fff" />
+                      <Text style={styles.highlightTypeText}>{config.label}</Text>
+                    </View>
+                    
+                    {/* Main Content Text */}
+                    <Text style={styles.highlightText}>{story.text}</Text>
+                    
+                    {/* Creator Info Row */}
+                    <View style={styles.highlightCreatorRow}>
+                      <Text style={styles.highlightCreatorName}>{story.user_name}</Text>
+                      <View style={styles.highlightDot} />
+                      <Text style={styles.highlightCategory}>{story.category}</Text>
+                    </View>
+                  </LinearGradient>
+                  
+                  {/* Live Badge */}
+                  {story.is_live && (
+                    <View style={styles.highlightLiveBadge}>
+                      <View style={styles.liveDot} />
+                      <Text style={styles.highlightLiveText}>LIVE</Text>
+                    </View>
+                  )}
+                  
+                  {/* Viewed Indicator */}
+                  {story.viewed && (
+                    <View style={styles.highlightViewedBadge}>
+                      <Ionicons name="checkmark-circle" size={14} color="#fff" />
+                      <Text style={styles.highlightViewedText}>Viewed</Text>
+                    </View>
+                  )}
+                  
+                  {/* Unviewed Border Glow */}
+                  {!story.viewed && (
+                    <View style={[styles.highlightGlow, { borderColor: config.color }]} />
+                  )}
                 </TouchableOpacity>
               );
             })}
