@@ -133,7 +133,62 @@ export default function ChatDetailScreen() {
   // Phase 3: ETA Timer
   const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   
+  // Phase 4: New states
+  const [dealSummaryExpanded, setDealSummaryExpanded] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const dealSummaryHeight = useRef(new Animated.Value(0)).current;
+  const celebrationAnim = useRef(new Animated.Value(0)).current;
+  
   const agentInfoHeight = useRef(new Animated.Value(0)).current;
+
+  // Agent badges based on stats
+  const getAgentBadges = () => {
+    const badges = [];
+    if (room?.agent) {
+      if (room.agent.rating >= 4.8) badges.push({ label: '⭐ Top Rated', color: '#F59E0B' });
+      if (room.agent.completed_wishes >= 50) badges.push({ label: '🏆 Expert', color: '#8B5CF6' });
+      if (room.agent.is_verified) badges.push({ label: '✓ Verified', color: '#10B981' });
+      if (room.agent.response_time?.includes('5 min')) badges.push({ label: '⚡ Fast', color: '#3B82F6' });
+    }
+    return badges;
+  };
+
+  // Toggle deal summary expansion
+  const toggleDealSummary = () => {
+    const toValue = dealSummaryExpanded ? 0 : 1;
+    Animated.timing(dealSummaryHeight, {
+      toValue,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+    setDealSummaryExpanded(!dealSummaryExpanded);
+  };
+
+  // Show celebration animation
+  const showCompletionCelebration = () => {
+    setShowCelebration(true);
+    Animated.sequence([
+      Animated.timing(celebrationAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.delay(2000),
+      Animated.timing(celebrationAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
+    ]).start(() => {
+      setShowCelebration(false);
+      setShowRatingModal(true);
+    });
+  };
+
+  // Check if should show rating prompt
+  useEffect(() => {
+    if (room?.status === 'completed') {
+      const timer = setTimeout(() => {
+        showCompletionCelebration();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [room?.status]);
 
   // Simulate typing indicator randomly
   useEffect(() => {
