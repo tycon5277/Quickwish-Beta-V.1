@@ -895,6 +895,13 @@ async def create_order(order_data: OrderCreate, current_user: User = Depends(req
     # Clear cart for this vendor only
     await db.carts.delete_one({"user_id": current_user.user_id, "vendor_id": order_data.vendor_id})
     
+    # Remove MongoDB _id before returning
+    order.pop("_id", None)
+    
+    # Convert datetime to string for JSON serialization
+    if isinstance(order.get("created_at"), datetime):
+        order["created_at"] = order["created_at"].isoformat()
+    
     # Return full order details for invoice
     return {
         "message": "Order placed successfully",
