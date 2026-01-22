@@ -161,6 +161,15 @@ export default function ExploreScreen() {
   // Story progress animation
   const progressAnim = useRef(new Animated.Value(0)).current;
   const storyTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Auto-scroll for highlights
+  const highlightsScrollRef = useRef<ScrollView>(null);
+  const [currentHighlightIndex, setCurrentHighlightIndex] = useState(0);
+  const autoScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isUserScrollingRef = useRef(false);
+  
+  const HIGHLIGHT_CARD_WIDTH = SCREEN_WIDTH * 0.75 + 12; // card width + margin
+  const AUTO_SCROLL_INTERVAL = 3500; // 3.5 seconds
 
   // Get sorted stories (unviewed first, then viewed)
   const sortedStories = [...stories].sort((a, b) => {
