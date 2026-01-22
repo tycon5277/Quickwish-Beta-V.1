@@ -797,13 +797,23 @@ export default function CreateWishScreen() {
       <View style={styles.inputGroup}>
         <View style={styles.radiusHeader}>
           <Text style={styles.inputLabel}>Visibility Radius</Text>
-          <TouchableOpacity style={styles.infoButton}>
-            <Ionicons name="information-circle-outline" size={18} color="#6366F1" />
-          </TouchableOpacity>
         </View>
-        <Text style={styles.radiusExplainer}>
-          Fulfillment agents within {radius} km of your location will see this wish
-        </Text>
+        
+        {/* Enhanced Explanation Card */}
+        <View style={styles.radiusExplainerCard}>
+          <View style={styles.radiusExplainerIcon}>
+            <Ionicons name="radio-outline" size={20} color="#6366F1" />
+          </View>
+          <View style={styles.radiusExplainerContent}>
+            <Text style={styles.radiusExplainerTitle}>Who can see your wish?</Text>
+            <Text style={styles.radiusExplainerText}>
+              Only Fulfillment Agents within <Text style={styles.radiusHighlight}>{radius} km</Text> of your location will be able to view and respond to this wish.
+            </Text>
+            <Text style={styles.radiusExplainerHint}>
+              💡 Tip: Larger radius = more potential helpers, but may take longer to reach you
+            </Text>
+          </View>
+        </View>
         <View style={styles.radiusContainer}>
           <TouchableOpacity
             style={styles.radiusButton}
