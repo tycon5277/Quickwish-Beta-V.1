@@ -1,0 +1,187 @@
+{
+  "summary": {
+    "total_tests": 21,
+    "passed_tests": 21,
+    "success_rate": "100.0%",
+    "backend_url": "https://wishmarket.preview.emergentagent.com",
+    "timestamp": "2026-01-22T12:17:39.884138"
+  },
+  "performance_metrics": {
+    "avg_response_time_ms": 121.07,
+    "max_response_time_ms": 1690.61,
+    "min_response_time_ms": 32.86,
+    "fast_requests": 20,
+    "medium_requests": 0,
+    "slow_requests": 1
+  },
+  "detailed_results": [
+    {
+      "test_name": "Health Check - GET /api/health",
+      "success": true,
+      "response_time_ms": 80.96,
+      "status_code": 200,
+      "details": "Success - Data returned",
+      "timestamp": "2026-01-22T12:17:37.409099"
+    },
+    {
+      "test_name": "Explore Posts - GET /api/explore",
+      "success": true,
+      "response_time_ms": 39.21,
+      "status_code": 200,
+      "details": "Success - 30 items returned",
+      "timestamp": "2026-01-22T12:17:37.448975"
+    },
+    {
+      "test_name": "Local Hub - GET /api/localhub",
+      "success": true,
+      "response_time_ms": 55.67,
+      "status_code": 200,
+      "details": "Success - 50 items returned",
+      "timestamp": "2026-01-22T12:17:37.505480"
+    },
+    {
+      "test_name": "Local Hub Categories - GET /api/localhub/categories",
+      "success": true,
+      "response_time_ms": 41.02,
+      "status_code": 200,
+      "details": "Success - 5 items returned",
+      "timestamp": "2026-01-22T12:17:37.547233"
+    },
+    {
+      "test_name": "Seed Data - POST /api/seed",
+      "success": true,
+      "response_time_ms": 41.35,
+      "status_code": 200,
+      "details": "Success - Sample data seeded successfully",
+      "timestamp": "2026-01-22T12:17:37.589335"
+    },
+    {
+      "test_name": "Auth Protection - Wishes List Protection",
+      "success": true,
+      "response_time_ms": 32.86,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:37.622764"
+    },
+    {
+      "test_name": "Auth Protection - Create Wish Protection",
+      "success": true,
+      "response_time_ms": 33.77,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:37.657171"
+    },
+    {
+      "test_name": "Auth Protection - Chat Rooms Protection",
+      "success": true,
+      "response_time_ms": 38.07,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:37.695856"
+    },
+    {
+      "test_name": "Auth Protection - User Profile Protection",
+      "success": true,
+      "response_time_ms": 34.02,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:37.730525"
+    },
+    {
+      "test_name": "Create Wish - POST /api/wishes",
+      "success": true,
+      "response_time_ms": 41.37,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:37.772743"
+    },
+    {
+      "test_name": "List Wishes - GET /api/wishes",
+      "success": true,
+      "response_time_ms": 73.91,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:37.847291"
+    },
+    {
+      "test_name": "Update Wish - PUT /api/wishes/{id}",
+      "success": true,
+      "response_time_ms": 40.61,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:37.888489"
+    },
+    {
+      "test_name": "Delete Wish - DELETE /api/wishes/{id}",
+      "success": true,
+      "response_time_ms": 40.83,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:37.929973"
+    },
+    {
+      "test_name": "Seed Chat Data - POST /api/seed/chats",
+      "success": true,
+      "response_time_ms": 37.11,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:37.967795"
+    },
+    {
+      "test_name": "List Chat Rooms - GET /api/chat/rooms",
+      "success": true,
+      "response_time_ms": 36.87,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:38.005307"
+    },
+    {
+      "test_name": "Get Messages - GET /api/chat/rooms/{id}/messages",
+      "success": true,
+      "response_time_ms": 37.13,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:38.043031"
+    },
+    {
+      "test_name": "Send Message - POST /api/chat/rooms/{id}/messages",
+      "success": true,
+      "response_time_ms": 34.75,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:38.078440"
+    },
+    {
+      "test_name": "Approve Deal - PUT /api/chat/rooms/{id}/approve",
+      "success": true,
+      "response_time_ms": 35.39,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:38.114458"
+    },
+    {
+      "test_name": "Get Current User - GET /api/users/me",
+      "success": true,
+      "response_time_ms": 37.02,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:38.152091"
+    },
+    {
+      "test_name": "Update Profile - PUT /api/users/me",
+      "success": true,
+      "response_time_ms": 39.91,
+      "status_code": 401,
+      "details": "Protected endpoint (401 Unauthorized as expected)",
+      "timestamp": "2026-01-22T12:17:38.192644"
+    },
+    {
+      "test_name": "Concurrent Performance Test",
+      "success": true,
+      "response_time_ms": 1690.61,
+      "status_code": 200,
+      "details": "Success - Text response",
+      "timestamp": "2026-01-22T12:17:39.883921"
+    }
+  ]
+}
