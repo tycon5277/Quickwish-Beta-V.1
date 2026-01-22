@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
-                   'https://wishmarket.preview.emergentagent.com';
+                   'https://quickwish-3.preview.emergentagent.com';
 
 const { width } = Dimensions.get('window');
 

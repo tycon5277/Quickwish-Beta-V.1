@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import statistics
 
 # Backend URL from frontend environment
-BACKEND_URL = "https://wishmarket.preview.emergentagent.com"
+BACKEND_URL = "https://quickwish-3.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
 class PerformanceAPITester:
