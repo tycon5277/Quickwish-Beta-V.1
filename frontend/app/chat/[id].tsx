@@ -1723,6 +1723,127 @@ export default function ChatDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Share Live Trip Modal (Phase 5) */}
+      <Modal visible={showShareTripModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.shareTripModal}>
+            <View style={styles.shareTripHeader}>
+              <View style={styles.shareTripIconContainer}>
+                <Ionicons name="location" size={32} color="#10B981" />
+              </View>
+              <Text style={styles.shareTripTitle}>Share Your Trip</Text>
+              <Text style={styles.shareTripSubtitle}>
+                Share your live location with family or friends for safety
+              </Text>
+            </View>
+
+            {/* Trip Preview Card */}
+            <View style={styles.tripPreviewCard}>
+              <View style={styles.tripPreviewHeader}>
+                <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.tripAgentAvatar}>
+                  <Text style={styles.tripAgentInitial}>{room?.agent?.name?.charAt(0) || 'A'}</Text>
+                </LinearGradient>
+                <View style={styles.tripAgentDetails}>
+                  <Text style={styles.tripAgentName}>{room?.agent?.name || 'Agent'}</Text>
+                  <View style={styles.tripAgentRating}>
+                    <Ionicons name="star" size={14} color="#F59E0B" />
+                    <Text style={styles.tripAgentRatingText}>{room?.agent?.rating || 'N/A'}</Text>
+                    {room?.agent?.is_verified && (
+                      <View style={styles.tripVerifiedBadge}>
+                        <Ionicons name="checkmark" size={10} color="#fff" />
+                      </View>
+                    )}
+                  </View>
+                </View>
+              </View>
+              
+              <View style={styles.tripDetailsRow}>
+                <Ionicons name="car" size={16} color="#6B7280" />
+                <Text style={styles.tripDetailText}>{room?.wish?.title || 'Trip'}</Text>
+              </View>
+              
+              <View style={styles.tripDetailsRow}>
+                <Ionicons name="time" size={16} color="#6B7280" />
+                <Text style={styles.tripDetailText}>ETA: {etaMinutes ? `${etaMinutes} mins` : 'Calculating...'}</Text>
+              </View>
+              
+              <View style={styles.tripDetailsRow}>
+                <Ionicons name="cash" size={16} color="#6B7280" />
+                <Text style={styles.tripDetailText}>₹{room?.wish?.remuneration || '0'}</Text>
+              </View>
+            </View>
+
+            {/* Shared Info Notice */}
+            <View style={styles.sharedInfoNotice}>
+              <Ionicons name="information-circle" size={18} color="#6366F1" />
+              <Text style={styles.sharedInfoText}>
+                Recipients will see your live location, driver details, and trip progress
+              </Text>
+            </View>
+
+            {/* Share Options */}
+            <Text style={styles.shareOptionsTitle}>Share via</Text>
+            <View style={styles.shareOptions}>
+              <TouchableOpacity style={styles.shareOption} onPress={() => shareLiveTrip('whatsapp')}>
+                <View style={[styles.shareOptionIcon, { backgroundColor: '#25D366' }]}>
+                  <Ionicons name="logo-whatsapp" size={24} color="#fff" />
+                </View>
+                <Text style={styles.shareOptionText}>WhatsApp</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.shareOption} onPress={() => shareLiveTrip('sms')}>
+                <View style={[styles.shareOptionIcon, { backgroundColor: '#3B82F6' }]}>
+                  <Ionicons name="chatbubble" size={24} color="#fff" />
+                </View>
+                <Text style={styles.shareOptionText}>SMS</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.shareOption} onPress={() => shareLiveTrip('link')}>
+                <View style={[styles.shareOptionIcon, { backgroundColor: '#6366F1' }]}>
+                  <Ionicons name="share-social" size={24} color="#fff" />
+                </View>
+                <Text style={styles.shareOptionText}>More</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Cancel Button */}
+            <TouchableOpacity 
+              style={styles.shareTripCancelButton}
+              onPress={() => setShowShareTripModal(false)}
+            >
+              <Text style={styles.shareTripCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Live Tracking Active Banner (Phase 5) */}
+      {isLiveTrackingActive && isRideType && (
+        <View style={styles.liveTrackingBanner}>
+          <View style={styles.liveTrackingContent}>
+            <View style={styles.livePulse}>
+              <Animated.View style={[styles.liveDot, { 
+                transform: [{ 
+                  scale: typingAnimation.interpolate({ 
+                    inputRange: [0, 1], 
+                    outputRange: [1, 1.5] 
+                  }) 
+                }] 
+              }]} />
+            </View>
+            <View style={styles.liveTrackingInfo}>
+              <Text style={styles.liveTrackingTitle}>📍 Live Tracking Active</Text>
+              <Text style={styles.liveTrackingSubtext}>
+                {tripSharedWith.length} contact{tripSharedWith.length !== 1 ? 's' : ''} can see your location
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity onPress={stopSharingTrip}>
+            <Ionicons name="close-circle" size={24} color="rgba(255,255,255,0.8)" />
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
