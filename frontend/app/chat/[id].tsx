@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Animated, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Animated, Linking, Image, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Audio } from 'expo-av';
+import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { useAuth } from '../_layout';
@@ -19,7 +21,11 @@ interface Message {
   sender_type: string;
   content: string;
   created_at: string;
-  type?: 'text' | 'offer' | 'system';
+  type?: 'text' | 'image' | 'voice' | 'system';
+  image_url?: string;
+  voice_url?: string;
+  voice_duration?: number;
+  status?: 'sending' | 'sent' | 'delivered' | 'read';
 }
 
 interface ChatRoom {
@@ -52,6 +58,8 @@ const QUICK_REPLIES = [
   { id: 'location', text: 'Can you share location?', icon: 'location' },
   { id: 'eta', text: 'What\'s your ETA?', icon: 'time' },
   { id: 'confirm', text: 'Confirmed!', icon: 'checkmark-circle' },
+  { id: 'omw', text: 'On my way!', icon: 'walk' },
+  { id: 'wait', text: 'Please wait, almost there', icon: 'hourglass' },
 ];
 
 // Deal progress steps
@@ -75,7 +83,51 @@ export default function ChatDetailScreen() {
   const [isSending, setIsSending] = useState(false);
   const [showAgentInfo, setShowAgentInfo] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [showAttachmentOptions, setShowAttachmentOptions] = useState(false);
+  
+  // Voice recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recordingTimer = useRef<NodeJS.Timeout | null>(null);
+  
+  // Voice playback states
+  const [playingVoice, setPlayingVoice] = useState<string | null>(null);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  
+  // Image preview
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  
+  // Typing indicator
+  const [isAgentTyping, setIsAgentTyping] = useState(false);
+  const typingAnimation = useRef(new Animated.Value(0)).current;
+  
   const agentInfoHeight = useRef(new Animated.Value(0)).current;
+
+  // Simulate typing indicator randomly
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (Math.random() > 0.7 && room?.status === 'active') {
+        setIsAgentTyping(true);
+        setTimeout(() => setIsAgentTyping(false), 3000);
+      }
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [room?.status]);
+
+  // Typing animation
+  useEffect(() => {
+    if (isAgentTyping) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(typingAnimation, { toValue: 1, duration: 500, useNativeDriver: true }),
+          Animated.timing(typingAnimation, { toValue: 0, duration: 500, useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      typingAnimation.setValue(0);
+    }
+  }, [isAgentTyping]);
 
   const fetchMessages = useCallback(async () => {
     if (!sessionToken || !id) return;
@@ -83,7 +135,12 @@ export default function ChatDetailScreen() {
       const response = await axios.get(`${BACKEND_URL}/api/chat/rooms/${id}/messages`, {
         headers: { Authorization: `Bearer ${sessionToken}` }
       });
-      setMessages(response.data);
+      // Add mock status to messages for demo
+      const enhancedMessages = response.data.map((msg: Message, idx: number) => ({
+        ...msg,
+        status: idx === response.data.length - 1 ? 'delivered' : 'read',
+      }));
+      setMessages(enhancedMessages);
     } catch (error) {
       console.error('Error fetching messages:', error);
     } finally {
@@ -99,7 +156,6 @@ export default function ChatDetailScreen() {
       });
       const foundRoom = response.data.find((r: ChatRoom) => r.room_id === id);
       if (foundRoom) {
-        // Enhance with mock agent data
         setRoom({
           ...foundRoom,
           agent: {
@@ -130,6 +186,18 @@ export default function ChatDetailScreen() {
     }, 100);
   }, [messages]);
 
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+      if (recording) {
+        recording.stopAndUnloadAsync();
+      }
+    };
+  }, [sound, recording]);
+
   const toggleAgentInfo = () => {
     const toValue = showAgentInfo ? 0 : 1;
     Animated.timing(agentInfoHeight, {
@@ -140,19 +208,20 @@ export default function ChatDetailScreen() {
     setShowAgentInfo(!showAgentInfo);
   };
 
-  const sendMessage = async (text?: string) => {
+  const sendMessage = async (text?: string, type: 'text' | 'image' | 'voice' = 'text', mediaUrl?: string, duration?: number) => {
     const messageText = text || newMessage.trim();
-    if (!messageText || !sessionToken || !id) return;
+    if ((!messageText && type === 'text') || !sessionToken || !id) return;
     
     setIsSending(true);
     try {
       await axios.post(
         `${BACKEND_URL}/api/chat/rooms/${id}/messages`,
-        { content: messageText },
+        { content: messageText || `[${type}]` },
         { headers: { Authorization: `Bearer ${sessionToken}` } }
       );
       setNewMessage('');
       setShowQuickReplies(false);
+      setShowAttachmentOptions(false);
       fetchMessages();
     } catch (error) {
       console.error('Error sending message:', error);
@@ -160,6 +229,157 @@ export default function ChatDetailScreen() {
     } finally {
       setIsSending(false);
     }
+  };
+
+  // Voice Recording Functions
+  const startRecording = async () => {
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant microphone permission to record voice messages.');
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      
+      setRecording(newRecording);
+      setIsRecording(true);
+      setRecordingDuration(0);
+      
+      // Start duration timer
+      recordingTimer.current = setInterval(() => {
+        setRecordingDuration(prev => {
+          if (prev >= 30) {
+            stopRecording();
+            return 30;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      Alert.alert('Error', 'Failed to start recording');
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording) return;
+    
+    try {
+      if (recordingTimer.current) {
+        clearInterval(recordingTimer.current);
+        recordingTimer.current = null;
+      }
+      
+      setIsRecording(false);
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+      
+      if (uri && recordingDuration >= 1) {
+        // Send voice message
+        await sendMessage(`🎤 Voice message (${recordingDuration}s)`, 'voice', uri, recordingDuration);
+      }
+      
+      setRecordingDuration(0);
+    } catch (error) {
+      console.error('Failed to stop recording:', error);
+    }
+  };
+
+  const cancelRecording = async () => {
+    if (!recording) return;
+    
+    try {
+      if (recordingTimer.current) {
+        clearInterval(recordingTimer.current);
+        recordingTimer.current = null;
+      }
+      
+      setIsRecording(false);
+      await recording.stopAndUnloadAsync();
+      setRecording(null);
+      setRecordingDuration(0);
+    } catch (error) {
+      console.error('Failed to cancel recording:', error);
+    }
+  };
+
+  // Voice Playback Functions
+  const playVoiceMessage = async (messageId: string) => {
+    // For demo, just show playing state
+    if (playingVoice === messageId) {
+      if (sound) {
+        await sound.stopAsync();
+        await sound.unloadAsync();
+        setSound(null);
+      }
+      setPlayingVoice(null);
+    } else {
+      setPlayingVoice(messageId);
+      // Simulate playback duration
+      setTimeout(() => {
+        setPlayingVoice(null);
+      }, 3000);
+    }
+  };
+
+  // Image Picker Functions
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant photo library permission to send images.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await sendMessage('📷 Image', 'image', result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+    setShowAttachmentOptions(false);
+  };
+
+  const takePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant camera permission to take photos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await sendMessage('📷 Photo', 'image', result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Error', 'Failed to take photo');
+    }
+    setShowAttachmentOptions(false);
   };
 
   const approveDeal = async () => {
@@ -236,6 +456,23 @@ export default function ChatDetailScreen() {
     return statusMap[room?.status || 'active'] || 0;
   };
 
+  const getMessageStatusIcon = (status?: string, isOwn?: boolean) => {
+    if (!isOwn) return null;
+    
+    switch (status) {
+      case 'sending':
+        return <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.5)" />;
+      case 'sent':
+        return <Ionicons name="checkmark" size={14} color="rgba(255,255,255,0.7)" />;
+      case 'delivered':
+        return <Ionicons name="checkmark-done" size={14} color="rgba(255,255,255,0.7)" />;
+      case 'read':
+        return <Ionicons name="checkmark-done" size={14} color="#60A5FA" />;
+      default:
+        return <Ionicons name="checkmark-done" size={14} color="rgba(255,255,255,0.7)" />;
+    }
+  };
+
   // Group messages by date
   const groupedMessages: { [date: string]: Message[] } = {};
   messages.forEach((msg) => {
@@ -250,6 +487,73 @@ export default function ChatDetailScreen() {
     inputRange: [0, 1],
     outputRange: [0, 160],
   });
+
+  const renderMessage = (message: Message, isOwn: boolean) => {
+    const isVoice = message.content.includes('🎤 Voice message');
+    const isImage = message.content.includes('📷');
+    
+    if (isVoice) {
+      const durationMatch = message.content.match(/\((\d+)s\)/);
+      const duration = durationMatch ? parseInt(durationMatch[1]) : 0;
+      const isPlaying = playingVoice === message.message_id;
+      
+      return (
+        <TouchableOpacity 
+          style={[styles.voiceMessage, isOwn ? styles.voiceMessageOwn : styles.voiceMessageOther]}
+          onPress={() => playVoiceMessage(message.message_id)}
+        >
+          <View style={styles.voicePlayButton}>
+            <Ionicons 
+              name={isPlaying ? "pause" : "play"} 
+              size={20} 
+              color={isOwn ? '#fff' : '#6366F1'} 
+            />
+          </View>
+          <View style={styles.voiceWaveform}>
+            {[...Array(12)].map((_, i) => (
+              <View 
+                key={i} 
+                style={[
+                  styles.voiceBar, 
+                  { 
+                    height: 8 + Math.random() * 16,
+                    backgroundColor: isOwn ? 'rgba(255,255,255,0.6)' : '#C7D2FE',
+                  }
+                ]} 
+              />
+            ))}
+          </View>
+          <Text style={[styles.voiceDuration, isOwn && styles.voiceDurationOwn]}>
+            {duration}s
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+
+    if (isImage) {
+      return (
+        <TouchableOpacity 
+          style={styles.imageMessage}
+          onPress={() => setPreviewImage('https://picsum.photos/400/300')}
+        >
+          <Image 
+            source={{ uri: 'https://picsum.photos/400/300' }} 
+            style={styles.chatImage}
+            resizeMode="cover"
+          />
+          <View style={styles.imageOverlay}>
+            <Ionicons name="expand-outline" size={20} color="#fff" />
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    return (
+      <Text style={[styles.messageText, isOwn && styles.messageTextOwn]}>
+        {message.content}
+      </Text>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -281,7 +585,8 @@ export default function ChatDetailScreen() {
               )}
             </View>
             <Text style={styles.headerStatus}>
-              {room?.status === 'approved' ? '✅ Deal Approved' : 
+              {isAgentTyping ? '✍️ typing...' :
+               room?.status === 'approved' ? '✅ Deal Approved' : 
                room?.status === 'completed' ? '🏆 Completed' : '💬 Tap for info'}
             </Text>
           </View>
@@ -449,21 +754,12 @@ export default function ChatDetailScreen() {
                         styles.messageBubble, 
                         isOwn ? styles.messageBubbleOwn : styles.messageBubbleOther
                       ]}>
-                        <Text style={[styles.messageText, isOwn && styles.messageTextOwn]}>
-                          {message.content}
-                        </Text>
+                        {renderMessage(message, isOwn)}
                         <View style={styles.messageFooter}>
                           <Text style={[styles.messageTime, isOwn && styles.messageTimeOwn]}>
                             {formatTime(message.created_at)}
                           </Text>
-                          {isOwn && (
-                            <Ionicons 
-                              name="checkmark-done" 
-                              size={14} 
-                              color="rgba(255,255,255,0.7)" 
-                              style={styles.readReceipt}
-                            />
-                          )}
+                          {getMessageStatusIcon(message.status, isOwn)}
                         </View>
                       </View>
                     </View>
@@ -471,6 +767,18 @@ export default function ChatDetailScreen() {
                 })}
               </View>
             ))}
+            
+            {/* Typing Indicator */}
+            {isAgentTyping && (
+              <View style={styles.typingContainer}>
+                <View style={styles.typingBubble}>
+                  <Animated.View style={[styles.typingDot, { opacity: typingAnimation }]} />
+                  <Animated.View style={[styles.typingDot, { opacity: typingAnimation, marginLeft: 4 }]} />
+                  <Animated.View style={[styles.typingDot, { opacity: typingAnimation, marginLeft: 4 }]} />
+                </View>
+                <Text style={styles.typingText}>{room?.agent?.name} is typing...</Text>
+              </View>
+            )}
           </ScrollView>
         )}
 
@@ -492,44 +800,129 @@ export default function ChatDetailScreen() {
           </View>
         )}
 
-        {/* Message Input */}
-        <View style={styles.inputContainer}>
-          <TouchableOpacity 
-            style={styles.quickReplyToggle}
-            onPress={() => setShowQuickReplies(!showQuickReplies)}
-          >
-            <Ionicons 
-              name={showQuickReplies ? "close" : "flash"} 
-              size={20} 
-              color="#6366F1" 
-            />
-          </TouchableOpacity>
-          
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Type a message..."
-              placeholderTextColor="#9CA3AF"
-              value={newMessage}
-              onChangeText={setNewMessage}
-              multiline
-              maxLength={1000}
-            />
+        {/* Attachment Options Modal */}
+        {showAttachmentOptions && (
+          <View style={styles.attachmentOptions}>
+            <TouchableOpacity style={styles.attachmentOption} onPress={takePhoto}>
+              <View style={[styles.attachmentIconBg, { backgroundColor: '#DBEAFE' }]}>
+                <Ionicons name="camera" size={24} color="#3B82F6" />
+              </View>
+              <Text style={styles.attachmentLabel}>Camera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.attachmentOption} onPress={pickImage}>
+              <View style={[styles.attachmentIconBg, { backgroundColor: '#D1FAE5' }]}>
+                <Ionicons name="image" size={24} color="#10B981" />
+              </View>
+              <Text style={styles.attachmentLabel}>Gallery</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.attachmentOption} onPress={handleShareLocation}>
+              <View style={[styles.attachmentIconBg, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="location" size={24} color="#F59E0B" />
+              </View>
+              <Text style={styles.attachmentLabel}>Location</Text>
+            </TouchableOpacity>
           </View>
-          
-          <TouchableOpacity
-            style={[styles.sendButton, (!newMessage.trim() || isSending) && styles.sendButtonDisabled]}
-            onPress={() => sendMessage()}
-            disabled={!newMessage.trim() || isSending}
-          >
-            {isSending ? (
-              <ActivityIndicator size="small" color="#fff" />
+        )}
+
+        {/* Recording Overlay */}
+        {isRecording && (
+          <View style={styles.recordingOverlay}>
+            <View style={styles.recordingContent}>
+              <View style={styles.recordingWave}>
+                <Animated.View style={[styles.recordingDot, { transform: [{ scale: typingAnimation.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] }) }] }]} />
+              </View>
+              <Text style={styles.recordingTime}>{recordingDuration}s / 30s</Text>
+              <Text style={styles.recordingHint}>Recording voice message...</Text>
+            </View>
+            <View style={styles.recordingActions}>
+              <TouchableOpacity style={styles.cancelRecordingButton} onPress={cancelRecording}>
+                <Ionicons name="trash" size={24} color="#EF4444" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.stopRecordingButton} onPress={stopRecording}>
+                <Ionicons name="send" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Message Input */}
+        {!isRecording && (
+          <View style={styles.inputContainer}>
+            <TouchableOpacity 
+              style={styles.attachButton}
+              onPress={() => setShowAttachmentOptions(!showAttachmentOptions)}
+            >
+              <Ionicons 
+                name={showAttachmentOptions ? "close" : "add-circle"} 
+                size={26} 
+                color="#6366F1" 
+              />
+            </TouchableOpacity>
+            
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Type a message..."
+                placeholderTextColor="#9CA3AF"
+                value={newMessage}
+                onChangeText={setNewMessage}
+                multiline
+                maxLength={1000}
+              />
+              <TouchableOpacity 
+                style={styles.quickReplyToggle}
+                onPress={() => setShowQuickReplies(!showQuickReplies)}
+              >
+                <Ionicons 
+                  name={showQuickReplies ? "flash" : "flash-outline"} 
+                  size={20} 
+                  color="#6366F1" 
+                />
+              </TouchableOpacity>
+            </View>
+            
+            {newMessage.trim() ? (
+              <TouchableOpacity
+                style={[styles.sendButton, isSending && styles.sendButtonDisabled]}
+                onPress={() => sendMessage()}
+                disabled={isSending}
+              >
+                {isSending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={18} color="#fff" />
+                )}
+              </TouchableOpacity>
             ) : (
-              <Ionicons name="send" size={18} color="#fff" />
+              <TouchableOpacity
+                style={styles.voiceButton}
+                onPress={startRecording}
+              >
+                <Ionicons name="mic" size={22} color="#6366F1" />
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
-        </View>
+          </View>
+        )}
       </KeyboardAvoidingView>
+
+      {/* Image Preview Modal */}
+      <Modal visible={!!previewImage} transparent animationType="fade">
+        <View style={styles.imagePreviewModal}>
+          <TouchableOpacity 
+            style={styles.imagePreviewClose}
+            onPress={() => setPreviewImage(null)}
+          >
+            <Ionicons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          {previewImage && (
+            <Image 
+              source={{ uri: previewImage }} 
+              style={styles.imagePreviewFull}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -869,6 +1262,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     marginTop: 4,
+    gap: 4,
   },
   messageTime: {
     fontSize: 11,
@@ -877,9 +1271,91 @@ const styles = StyleSheet.create({
   messageTimeOwn: {
     color: 'rgba(255,255,255,0.7)',
   },
-  readReceipt: {
-    marginLeft: 4,
+  // Voice Message Styles
+  voiceMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
   },
+  voiceMessageOwn: {},
+  voiceMessageOther: {},
+  voicePlayButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  voiceWaveform: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 24,
+    gap: 2,
+  },
+  voiceBar: {
+    width: 3,
+    borderRadius: 2,
+  },
+  voiceDuration: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginLeft: 8,
+  },
+  voiceDurationOwn: {
+    color: 'rgba(255,255,255,0.7)',
+  },
+  // Image Message Styles
+  imageMessage: {
+    position: 'relative',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  chatImage: {
+    width: 200,
+    height: 150,
+    borderRadius: 12,
+  },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Typing Indicator
+  typingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  typingBubble: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
+  },
+  typingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#9CA3AF',
+  },
+  typingText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginLeft: 8,
+    fontStyle: 'italic',
+  },
+  // Quick Replies
   quickRepliesContainer: {
     backgroundColor: '#fff',
     paddingVertical: 10,
@@ -902,6 +1378,85 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 6,
   },
+  // Attachment Options
+  attachmentOptions: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    justifyContent: 'space-around',
+  },
+  attachmentOption: {
+    alignItems: 'center',
+  },
+  attachmentIconBg: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  attachmentLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  // Recording Overlay
+  recordingOverlay: {
+    backgroundColor: '#fff',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  recordingContent: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  recordingWave: {
+    marginBottom: 12,
+  },
+  recordingDot: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#EF4444',
+  },
+  recordingTime: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  recordingHint: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  recordingActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 40,
+  },
+  cancelRecordingButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stopRecordingButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#6366F1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Input Container
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -911,27 +1466,31 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },
-  quickReplyToggle: {
+  attachButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
   },
   inputWrapper: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F3F4F6',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
     maxHeight: 120,
+    marginHorizontal: 8,
   },
   textInput: {
+    flex: 1,
     fontSize: 15,
     color: '#1F2937',
     maxHeight: 100,
+  },
+  quickReplyToggle: {
+    padding: 4,
   },
   sendButton: {
     width: 40,
@@ -940,9 +1499,39 @@ const styles = StyleSheet.create({
     backgroundColor: '#6366F1',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
   },
   sendButtonDisabled: {
     backgroundColor: '#D1D5DB',
+  },
+  voiceButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Image Preview Modal
+  imagePreviewModal: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePreviewClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  imagePreviewFull: {
+    width: '100%',
+    height: '80%',
   },
 });
