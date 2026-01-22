@@ -1042,29 +1042,121 @@ export default function ChatDetailScreen() {
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Deal Summary Card (Phase 3) */}
+            {/* Expandable Deal Summary Card (Phase 4) */}
             {room?.wish && (
               <View style={styles.dealSummaryCard}>
-                <View style={styles.dealSummaryHeader}>
-                  <Ionicons name="document-text" size={18} color="#6366F1" />
-                  <Text style={styles.dealSummaryTitle}>Deal Summary</Text>
-                </View>
-                <View style={styles.dealSummaryRow}>
-                  <Text style={styles.dealSummaryLabel}>Wish</Text>
-                  <Text style={styles.dealSummaryValue}>{room.wish.title}</Text>
-                </View>
-                <View style={styles.dealSummaryRow}>
-                  <Text style={styles.dealSummaryLabel}>Agreed Price</Text>
-                  <Text style={styles.dealSummaryPrice}>₹{room.wish.remuneration}</Text>
-                </View>
-                <View style={styles.dealSummaryRow}>
-                  <Text style={styles.dealSummaryLabel}>Status</Text>
-                  <View style={[styles.dealStatusBadge, { backgroundColor: room.status === 'completed' ? '#D1FAE5' : '#DBEAFE' }]}>
-                    <Text style={[styles.dealStatusText, { color: room.status === 'completed' ? '#10B981' : '#3B82F6' }]}>
-                      {room.status.replace('_', ' ').toUpperCase()}
+                <TouchableOpacity style={styles.dealSummaryHeader} onPress={toggleDealSummary}>
+                  <View style={styles.dealSummaryHeaderLeft}>
+                    <Ionicons name="document-text" size={18} color="#6366F1" />
+                    <Text style={styles.dealSummaryTitle}>Deal Summary</Text>
+                  </View>
+                  <View style={styles.dealSummaryHeaderRight}>
+                    <View style={[styles.dealStatusBadge, { backgroundColor: room.status === 'completed' ? '#D1FAE5' : '#DBEAFE' }]}>
+                      <Text style={[styles.dealStatusText, { color: room.status === 'completed' ? '#10B981' : '#3B82F6' }]}>
+                        {room.status.replace('_', ' ').toUpperCase()}
+                      </Text>
+                    </View>
+                    <Ionicons 
+                      name={dealSummaryExpanded ? "chevron-up" : "chevron-down"} 
+                      size={20} 
+                      color="#6B7280" 
+                    />
+                  </View>
+                </TouchableOpacity>
+                
+                {/* Collapsed Preview */}
+                {!dealSummaryExpanded && (
+                  <View style={styles.dealSummaryPreview}>
+                    <Text style={styles.dealSummaryPreviewText} numberOfLines={1}>
+                      {room.wish.title} • ₹{room.wish.remuneration}
                     </Text>
                   </View>
-                </View>
+                )}
+                
+                {/* Expanded Content */}
+                {dealSummaryExpanded && (
+                  <Animated.View style={styles.dealSummaryExpanded}>
+                    {/* Agent Info with Badges */}
+                    <View style={styles.dealAgentSection}>
+                      <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.dealAgentAvatar}>
+                        <Text style={styles.dealAgentAvatarText}>{room.agent?.name?.charAt(0) || 'A'}</Text>
+                      </LinearGradient>
+                      <View style={styles.dealAgentInfo}>
+                        <Text style={styles.dealAgentName}>{room.agent?.name || 'Agent'}</Text>
+                        <View style={styles.dealAgentBadges}>
+                          {getAgentBadges().map((badge, idx) => (
+                            <View key={idx} style={[styles.agentBadge, { backgroundColor: badge.color + '20' }]}>
+                              <Text style={[styles.agentBadgeText, { color: badge.color }]}>{badge.label}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.dealDivider} />
+                    
+                    {/* Wish Details */}
+                    <View style={styles.dealDetailRow}>
+                      <View style={styles.dealDetailIcon}>
+                        <Ionicons name="sparkles" size={16} color="#6366F1" />
+                      </View>
+                      <View style={styles.dealDetailContent}>
+                        <Text style={styles.dealDetailLabel}>Wish</Text>
+                        <Text style={styles.dealDetailValue}>{room.wish.title}</Text>
+                      </View>
+                    </View>
+                    
+                    {room.wish.description && (
+                      <View style={styles.dealDetailRow}>
+                        <View style={styles.dealDetailIcon}>
+                          <Ionicons name="information-circle" size={16} color="#6B7280" />
+                        </View>
+                        <View style={styles.dealDetailContent}>
+                          <Text style={styles.dealDetailLabel}>Description</Text>
+                          <Text style={styles.dealDetailValue}>{room.wish.description}</Text>
+                        </View>
+                      </View>
+                    )}
+                    
+                    <View style={styles.dealDetailRow}>
+                      <View style={styles.dealDetailIcon}>
+                        <Ionicons name="pricetag" size={16} color="#10B981" />
+                      </View>
+                      <View style={styles.dealDetailContent}>
+                        <Text style={styles.dealDetailLabel}>Agreed Price</Text>
+                        <Text style={styles.dealDetailPriceValue}>₹{room.wish.remuneration}</Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.dealDetailRow}>
+                      <View style={styles.dealDetailIcon}>
+                        <Ionicons name="layers" size={16} color="#F59E0B" />
+                      </View>
+                      <View style={styles.dealDetailContent}>
+                        <Text style={styles.dealDetailLabel}>Category</Text>
+                        <Text style={styles.dealDetailValue}>{room.wish.wish_type?.replace('_', ' ')}</Text>
+                      </View>
+                    </View>
+                    
+                    {etaMinutes && (
+                      <View style={styles.dealDetailRow}>
+                        <View style={styles.dealDetailIcon}>
+                          <Ionicons name="time" size={16} color="#3B82F6" />
+                        </View>
+                        <View style={styles.dealDetailContent}>
+                          <Text style={styles.dealDetailLabel}>ETA</Text>
+                          <Text style={styles.dealDetailValue}>{etaMinutes} minutes</Text>
+                        </View>
+                      </View>
+                    )}
+                    
+                    {/* Encryption Notice (Phase 4) */}
+                    <View style={styles.encryptionNotice}>
+                      <Ionicons name="lock-closed" size={12} color="#9CA3AF" />
+                      <Text style={styles.encryptionText}>Messages are end-to-end encrypted</Text>
+                    </View>
+                  </Animated.View>
+                )}
               </View>
             )}
 
