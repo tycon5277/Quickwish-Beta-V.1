@@ -289,7 +289,7 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/wish/create', params: { type: action.type } })}
             >
               <View style={styles.quickActionIcon}>
-                <Ionicons name={action.icon as any} size={24} color="#6366F1" />
+                <Ionicons name={action.icon as any} size={24} color="#7C3AED" />
               </View>
               <Text style={styles.quickActionLabel}>{action.label}</Text>
             </TouchableOpacity>
@@ -307,7 +307,7 @@ export default function HomeScreen() {
         </View>
 
         {isLoading ? (
-          <ActivityIndicator size="small" color="#6366F1" style={styles.loader} />
+          <ActivityIndicator size="small" color="#7C3AED" style={styles.loader} />
         ) : activeWishes.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="sparkles-outline" size={48} color="#D1D5DB" />
@@ -325,7 +325,7 @@ export default function HomeScreen() {
               >
                 <View style={styles.wishCardMain}>
                   <View style={styles.wishCardIcon}>
-                    <Ionicons name={getWishTypeIcon(wish.wish_type) as any} size={24} color="#6366F1" />
+                    <Ionicons name={getWishTypeIcon(wish.wish_type) as any} size={24} color="#7C3AED" />
                   </View>
                   <View style={styles.wishCardContent}>
                     <Text style={styles.wishCardTitle} numberOfLines={1}>{wish.title}</Text>
