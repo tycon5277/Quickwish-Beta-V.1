@@ -646,11 +646,19 @@ export default function CreateWishScreen() {
                 ]}
                 onPress={() => handleSelectSubCategory(sub.id)}
               >
-                <Ionicons
-                  name={sub.icon as any}
-                  size={28}
-                  color={subCategory === sub.id ? '#fff' : '#6366F1'}
-                />
+                {sub.customIcon ? (
+                  <BoxIcon 
+                    type={sub.customIcon} 
+                    color={subCategory === sub.id ? '#fff' : '#6366F1'} 
+                    size={28} 
+                  />
+                ) : (
+                  <Ionicons
+                    name={sub.icon as any}
+                    size={28}
+                    color={subCategory === sub.id ? '#fff' : '#6366F1'}
+                  />
+                )}
                 <Text style={[
                   styles.subCategoryLabel,
                   subCategory === sub.id && styles.subCategoryLabelSelected
