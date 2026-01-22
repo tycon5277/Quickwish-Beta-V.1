@@ -142,7 +142,18 @@ export default function ChatDetailScreen() {
   const dealSummaryHeight = useRef(new Animated.Value(0)).current;
   const celebrationAnim = useRef(new Animated.Value(0)).current;
   
+  // Phase 5: Share Live Trip states
+  const [showShareTripModal, setShowShareTripModal] = useState(false);
+  const [tripSharedWith, setTripSharedWith] = useState<string[]>([]);
+  const [isLiveTrackingActive, setIsLiveTrackingActive] = useState(false);
+  
   const agentInfoHeight = useRef(new Animated.Value(0)).current;
+
+  // Check if this is a ride/travel type wish
+  const isRideType = useMemo(() => {
+    const rideTypes = ['ride_request', 'commercial_ride'];
+    return rideTypes.includes(room?.wish?.wish_type || '');
+  }, [room?.wish?.wish_type]);
 
   // Agent badges based on stats
   const getAgentBadges = () => {
@@ -154,6 +165,81 @@ export default function ChatDetailScreen() {
       if (room.agent.response_time?.includes('5 min')) badges.push({ label: '⚡ Fast', color: '#3B82F6' });
     }
     return badges;
+  };
+
+  // Generate shareable trip link
+  const generateTripLink = () => {
+    const tripId = `trip_${room?.room_id}_${Date.now()}`;
+    return `https://quickwish.app/track/${tripId}`;
+  };
+
+  // Share Live Trip function
+  const shareLiveTrip = async (method: 'link' | 'whatsapp' | 'sms') => {
+    const tripLink = generateTripLink();
+    const agentName = room?.agent?.name || 'Agent';
+    const agentRating = room?.agent?.rating || 'N/A';
+    const wishTitle = room?.wish?.title || 'Trip';
+    const eta = etaMinutes ? `${etaMinutes} mins` : 'Calculating...';
+    
+    const shareMessage = `🚗 I'm traveling with QuickWish!\n\n` +
+      `📍 Trip: ${wishTitle}\n` +
+      `👤 Driver: ${agentName} (⭐ ${agentRating})\n` +
+      `⏱️ ETA: ${eta}\n\n` +
+      `📲 Track my live location:\n${tripLink}\n\n` +
+      `This link will be active until my trip ends.`;
+    
+    try {
+      if (method === 'whatsapp') {
+        const whatsappUrl = `whatsapp://send?text=${encodeURIComponent(shareMessage)}`;
+        const canOpen = await Linking.canOpenURL(whatsappUrl);
+        if (canOpen) {
+          await Linking.openURL(whatsappUrl);
+        } else {
+          Alert.alert('WhatsApp Not Found', 'Please install WhatsApp to share via this method.');
+        }
+      } else if (method === 'sms') {
+        const smsUrl = `sms:?body=${encodeURIComponent(shareMessage)}`;
+        await Linking.openURL(smsUrl);
+      } else {
+        await Share.share({
+          message: shareMessage,
+          title: 'Share My Trip',
+        });
+      }
+      
+      setIsLiveTrackingActive(true);
+      setTripSharedWith(prev => [...prev, method]);
+      setShowShareTripModal(false);
+      
+      Alert.alert(
+        '✅ Trip Shared!',
+        'Your live location is now being shared. They can track your trip in real-time.',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Error sharing trip:', error);
+      Alert.alert('Error', 'Failed to share trip. Please try again.');
+    }
+  };
+
+  // Stop sharing trip
+  const stopSharingTrip = () => {
+    Alert.alert(
+      'Stop Sharing?',
+      'Your contacts will no longer be able to track your location.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Stop Sharing', 
+          style: 'destructive',
+          onPress: () => {
+            setIsLiveTrackingActive(false);
+            setTripSharedWith([]);
+            Alert.alert('Sharing Stopped', 'Your trip is no longer being shared.');
+          }
+        }
+      ]
+    );
   };
 
   // Toggle deal summary expansion
