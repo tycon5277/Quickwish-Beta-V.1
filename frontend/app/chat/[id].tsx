@@ -1452,6 +1452,25 @@ export default function ChatDetailScreen() {
           onPress={() => setShowMenuModal(false)}
         >
           <View style={styles.menuModal}>
+            {/* Share Trip - Only for ride types */}
+            {isRideType && (room?.status === 'approved' || room?.status === 'in_progress') && (
+              <>
+                <TouchableOpacity 
+                  style={styles.menuItem} 
+                  onPress={() => { setShowMenuModal(false); setShowShareTripModal(true); }}
+                >
+                  <Ionicons name="share-social" size={22} color="#10B981" />
+                  <Text style={[styles.menuItemText, { color: '#10B981' }]}>Share Live Trip</Text>
+                </TouchableOpacity>
+                {isLiveTrackingActive && (
+                  <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenuModal(false); stopSharingTrip(); }}>
+                    <Ionicons name="stop-circle" size={22} color="#F59E0B" />
+                    <Text style={styles.menuItemText}>Stop Sharing</Text>
+                  </TouchableOpacity>
+                )}
+                <View style={styles.menuDivider} />
+              </>
+            )}
             <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenuModal(false); setShowReportModal(true); }}>
               <Ionicons name="flag" size={22} color="#EF4444" />
               <Text style={styles.menuItemText}>Report User</Text>
