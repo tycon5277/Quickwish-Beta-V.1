@@ -29,19 +29,19 @@ interface UserStats {
 
 const LEVEL_CONFIG: Record<string, { min: number; max: number; color: string; icon: string }> = {
   'Newbie': { min: 0, max: 5, color: '#9CA3AF', icon: 'leaf' },
-  'Explorer': { min: 5, max: 15, color: '#10B981', icon: 'compass' },
-  'Regular': { min: 15, max: 30, color: '#3B82F6', icon: 'star' },
-  'Champion': { min: 30, max: 50, color: '#8B5CF6', icon: 'trophy' },
-  'Legend': { min: 50, max: 100, color: '#F59E0B', icon: 'flame' },
+  'Explorer': { min: 5, max: 15, color: '#7C3AED', icon: 'compass' },
+  'Regular': { min: 15, max: 30, color: '#0EA5E9', icon: 'star' },
+  'Champion': { min: 30, max: 50, color: '#F59E0B', icon: 'trophy' },
+  'Legend': { min: 50, max: 100, color: '#EF4444', icon: 'flame' },
 };
 
 const BADGE_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
-  'first_order': { label: 'First Order', icon: 'cart', color: '#10B981' },
+  'first_order': { label: 'First Order', icon: 'cart', color: '#7C3AED' },
   'first_wish': { label: 'First Wish', icon: 'sparkles', color: '#F59E0B' },
-  'five_orders': { label: '5 Orders', icon: 'ribbon', color: '#3B82F6' },
-  'ten_orders': { label: '10 Orders', icon: 'medal', color: '#8B5CF6' },
-  'verified_phone': { label: 'Verified Phone', icon: 'call', color: '#10B981' },
-  'verified_email': { label: 'Verified Email', icon: 'mail', color: '#3B82F6' },
+  'five_orders': { label: '5 Orders', icon: 'ribbon', color: '#0EA5E9' },
+  'ten_orders': { label: '10 Orders', icon: 'medal', color: '#7C3AED' },
+  'verified_phone': { label: 'Verified Phone', icon: 'call', color: '#7C3AED' },
+  'verified_email': { label: 'Verified Email', icon: 'mail', color: '#0EA5E9' },
   'early_adopter': { label: 'Early Adopter', icon: 'rocket', color: '#EF4444' },
   'top_rated': { label: 'Top Rated', icon: 'star', color: '#F59E0B' },
 };
