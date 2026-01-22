@@ -1239,8 +1239,34 @@ const styles = StyleSheet.create({
   addAddressText: { fontSize: 14, color: '#6366F1', marginLeft: 6 },
   
   // Radius
-  radiusHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  radiusHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   infoButton: { marginLeft: 6 },
+  
+  // Enhanced Radius Explainer Card
+  radiusExplainerCard: {
+    flexDirection: 'row',
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  radiusExplainerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  radiusExplainerContent: { flex: 1 },
+  radiusExplainerTitle: { fontSize: 14, fontWeight: '600', color: '#4338CA', marginBottom: 4 },
+  radiusExplainerText: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 6 },
+  radiusHighlight: { fontWeight: '700', color: '#6366F1' },
+  radiusExplainerHint: { fontSize: 11, color: '#6B7280', fontStyle: 'italic' },
+  
   radiusExplainer: { fontSize: 12, color: '#6B7280', marginBottom: 12, lineHeight: 18 },
   radiusContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   radiusButton: {
