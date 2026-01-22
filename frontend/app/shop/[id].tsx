@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Modal, TextInput, Dimensions, Animated, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Modal, TextInput, Dimensions, Animated, Platform, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import axios from 'axios';
 import Constants from 'expo-constants';
 import { useAuth } from '../_layout';
@@ -56,6 +57,8 @@ interface UserAddress {
   id: string;
   label: string;
   address: string;
+  lat?: number;
+  lng?: number;
 }
 
 // Toast Component
@@ -91,7 +94,7 @@ const Toast = ({ visible, message, onHide }: { visible: boolean; message: string
   );
 };
 
-// Confetti animation placeholder
+// Confetti animation 
 const Confetti = ({ visible }: { visible: boolean }) => {
   if (!visible) return null;
   return (
@@ -103,6 +106,7 @@ const Confetti = ({ visible }: { visible: boolean }) => {
             styles.confettiPiece, 
             { 
               left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 50}%`,
               backgroundColor: ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'][i % 5],
               transform: [{ rotate: `${Math.random() * 360}deg` }]
             }
@@ -115,7 +119,8 @@ const Confetti = ({ visible }: { visible: boolean }) => {
 
 export default function ShopScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const vendorId = typeof params.id === 'string' ? params.id : params.id?.[0] || '';
   const { sessionToken, user } = useAuth();
   
   const [vendor, setVendor] = useState<HubVendor | null>(null);
@@ -129,6 +134,7 @@ export default function ShopScreen() {
   const [showCartModal, setShowCartModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -139,31 +145,36 @@ export default function ShopScreen() {
   const [placedOrder, setPlacedOrder] = useState<any>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [newAddressLabel, setNewAddressLabel] = useState('');
+  const [newAddressText, setNewAddressText] = useState('');
 
   const fetchVendor = useCallback(async () => {
+    if (!vendorId) return;
     try {
-      const response = await axios.get(`${BACKEND_URL}/api/localhub/vendors/${id}`);
+      const response = await axios.get(`${BACKEND_URL}/api/localhub/vendors/${vendorId}`);
       setVendor(response.data);
     } catch (error) {
       console.error('Error fetching vendor:', error);
     }
-  }, [id]);
+  }, [vendorId]);
 
   const fetchProducts = useCallback(async () => {
+    if (!vendorId) return;
     try {
-      const response = await axios.get(`${BACKEND_URL}/api/localhub/vendors/${id}/products`);
+      const response = await axios.get(`${BACKEND_URL}/api/localhub/vendors/${vendorId}/products`);
       setProducts(response.data);
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [id]);
+  }, [vendorId]);
 
   const fetchCart = useCallback(async () => {
-    if (!sessionToken) return;
+    if (!sessionToken || !vendorId) return;
     try {
-      const response = await axios.get(`${BACKEND_URL}/api/cart?vendor_id=${id}`, {
+      const response = await axios.get(`${BACKEND_URL}/api/cart?vendor_id=${vendorId}`, {
         headers: { Authorization: `Bearer ${sessionToken}` }
       });
       const items = response.data.items || [];
@@ -178,7 +189,7 @@ export default function ShopScreen() {
     } catch (error) {
       console.error('Error fetching cart:', error);
     }
-  }, [sessionToken, id]);
+  }, [sessionToken, vendorId]);
 
   const fetchUserAddresses = useCallback(async () => {
     if (!sessionToken) return;
@@ -186,11 +197,12 @@ export default function ShopScreen() {
       const response = await axios.get(`${BACKEND_URL}/api/auth/me`, {
         headers: { Authorization: `Bearer ${sessionToken}` }
       });
-      setUserAddresses(response.data.addresses || []);
+      const addresses = response.data.addresses || [];
+      setUserAddresses(addresses);
       // Auto-select first address if available
-      if (response.data.addresses?.length > 0) {
-        setSelectedAddressId(response.data.addresses[0].id);
-        setDeliveryAddress(response.data.addresses[0].address);
+      if (addresses.length > 0 && !selectedAddressId) {
+        setSelectedAddressId(addresses[0].id);
+        setDeliveryAddress(addresses[0].address);
       }
     } catch (error) {
       console.error('Error fetching addresses:', error);
@@ -198,11 +210,13 @@ export default function ShopScreen() {
   }, [sessionToken]);
 
   useEffect(() => {
-    fetchVendor();
-    fetchProducts();
-    fetchCart();
-    fetchUserAddresses();
-  }, [fetchVendor, fetchProducts, fetchCart, fetchUserAddresses]);
+    if (vendorId) {
+      fetchVendor();
+      fetchProducts();
+      fetchCart();
+      fetchUserAddresses();
+    }
+  }, [vendorId, fetchVendor, fetchProducts, fetchCart, fetchUserAddresses]);
 
   const productCategories = ['all', ...new Set(products.map(p => p.category))];
   
@@ -249,13 +263,78 @@ export default function ShopScreen() {
   const clearCart = async () => {
     if (!sessionToken) return;
     try {
-      await axios.delete(`${BACKEND_URL}/api/cart/clear?vendor_id=${id}`, {
+      await axios.delete(`${BACKEND_URL}/api/cart/clear?vendor_id=${vendorId}`, {
         headers: { Authorization: `Bearer ${sessionToken}` }
       });
       setCart([]);
       setCartMap({});
     } catch (error) {
       console.error('Error clearing cart:', error);
+    }
+  };
+
+  const getCurrentLocation = async () => {
+    setIsGettingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        showToast('Location permission denied');
+        setIsGettingLocation(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const [reverseGeocode] = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      });
+
+      if (reverseGeocode) {
+        const address = [
+          reverseGeocode.name,
+          reverseGeocode.street,
+          reverseGeocode.district,
+          reverseGeocode.city,
+          reverseGeocode.region,
+          reverseGeocode.postalCode
+        ].filter(Boolean).join(', ');
+        
+        setDeliveryAddress(address);
+        setSelectedAddressId(null);
+        showToast('Location detected!');
+      }
+    } catch (error) {
+      console.error('Error getting location:', error);
+      showToast('Failed to get location');
+    } finally {
+      setIsGettingLocation(false);
+    }
+  };
+
+  const addNewAddress = async () => {
+    if (!sessionToken || !newAddressText.trim()) return;
+    
+    try {
+      const response = await axios.post(`${BACKEND_URL}/api/users/addresses`,
+        { label: newAddressLabel || 'Home', address: newAddressText },
+        { headers: { Authorization: `Bearer ${sessionToken}` } }
+      );
+      
+      await fetchUserAddresses();
+      setShowAddAddressModal(false);
+      setNewAddressLabel('');
+      setNewAddressText('');
+      
+      // Select the new address
+      if (response.data.address) {
+        setSelectedAddressId(response.data.address.id);
+        setDeliveryAddress(response.data.address.address);
+      }
+      
+      showToast('Address saved!');
+    } catch (error) {
+      console.error('Error adding address:', error);
+      showToast('Failed to save address');
     }
   };
 
@@ -270,12 +349,24 @@ export default function ShopScreen() {
       return;
     }
 
+    if (!vendorId) {
+      showToast('Invalid vendor');
+      return;
+    }
+
+    if (cart.length === 0) {
+      showToast('Cart is empty');
+      return;
+    }
+
     setIsPlacingOrder(true);
 
     try {
+      console.log('Placing order with:', { vendorId, deliveryAddress, deliveryType });
+      
       const response = await axios.post(`${BACKEND_URL}/api/orders`,
         {
-          vendor_id: id,
+          vendor_id: vendorId,
           delivery_address: { 
             address: deliveryAddress,
             label: selectedAddressId ? userAddresses.find(a => a.id === selectedAddressId)?.label : 'Delivery'
@@ -284,6 +375,8 @@ export default function ShopScreen() {
         },
         { headers: { Authorization: `Bearer ${sessionToken}` } }
       );
+      
+      console.log('Order response:', response.data);
       
       setShowCheckoutModal(false);
       setCart([]);
@@ -295,6 +388,7 @@ export default function ShopScreen() {
       // Hide confetti after animation
       setTimeout(() => setShowConfetti(false), 3000);
     } catch (error: any) {
+      console.error('Error placing order:', error.response?.data || error);
       showToast(error.response?.data?.detail || 'Failed to place order');
     } finally {
       setIsPlacingOrder(false);
@@ -754,32 +848,53 @@ export default function ShopScreen() {
 
             <ScrollView style={styles.checkoutContent}>
               {/* Saved Addresses */}
-              {userAddresses.length > 0 && (
-                <View style={styles.checkoutSection}>
-                  <Text style={styles.checkoutSectionTitle}>Saved Addresses</Text>
-                  {userAddresses.map((addr) => (
-                    <TouchableOpacity 
-                      key={addr.id}
-                      style={[styles.addressOption, selectedAddressId === addr.id && styles.addressOptionSelected]}
-                      onPress={() => handleAddressSelect(addr)}
-                    >
-                      <View style={[styles.radioOuter, selectedAddressId === addr.id && styles.radioOuterSelected]}>
-                        {selectedAddressId === addr.id && <View style={styles.radioInner} />}
-                      </View>
-                      <View style={styles.addressOptionContent}>
-                        <Text style={styles.addressLabel}>{addr.label}</Text>
-                        <Text style={styles.addressText}>{addr.address}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-
-              {/* Delivery Address */}
               <View style={styles.checkoutSection}>
-                <Text style={styles.checkoutSectionTitle}>
-                  {userAddresses.length > 0 ? 'Or Enter New Address' : 'Delivery Address'}
-                </Text>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.checkoutSectionTitle}>Delivery Address</Text>
+                  <TouchableOpacity onPress={() => setShowAddAddressModal(true)}>
+                    <Text style={styles.addNewText}>+ Add New</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* GPS Location Button */}
+                <TouchableOpacity 
+                  style={styles.gpsButton}
+                  onPress={getCurrentLocation}
+                  disabled={isGettingLocation}
+                >
+                  {isGettingLocation ? (
+                    <ActivityIndicator size="small" color="#3B82F6" />
+                  ) : (
+                    <Ionicons name="locate" size={20} color="#3B82F6" />
+                  )}
+                  <Text style={styles.gpsButtonText}>
+                    {isGettingLocation ? 'Getting location...' : 'Use Current Location'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Saved Addresses List */}
+                {userAddresses.length > 0 && (
+                  <View style={styles.savedAddresses}>
+                    {userAddresses.map((addr) => (
+                      <TouchableOpacity 
+                        key={addr.id}
+                        style={[styles.addressOption, selectedAddressId === addr.id && styles.addressOptionSelected]}
+                        onPress={() => handleAddressSelect(addr)}
+                      >
+                        <View style={[styles.radioOuter, selectedAddressId === addr.id && styles.radioOuterSelected]}>
+                          {selectedAddressId === addr.id && <View style={styles.radioInner} />}
+                        </View>
+                        <View style={styles.addressOptionContent}>
+                          <Text style={styles.addressLabel}>{addr.label}</Text>
+                          <Text style={styles.addressText} numberOfLines={2}>{addr.address}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Manual Address Input */}
+                <Text style={styles.orText}>Or enter address manually</Text>
                 <TextInput
                   style={styles.addressInput}
                   placeholder="Enter your full delivery address..."
@@ -807,7 +922,7 @@ export default function ShopScreen() {
                       <View style={[styles.radioOuter, deliveryType === 'shop_delivery' && styles.radioOuterSelected]}>
                         {deliveryType === 'shop_delivery' && <View style={styles.radioInner} />}
                       </View>
-                      <View>
+                      <View style={styles.deliveryOptionInfo}>
                         <Text style={styles.deliveryOptionTitle}>Shop's Own Delivery</Text>
                         <Text style={styles.deliveryOptionDesc}>Delivered by {vendor.name}</Text>
                       </View>
@@ -824,9 +939,9 @@ export default function ShopScreen() {
                     <View style={[styles.radioOuter, deliveryType === 'agent_delivery' && styles.radioOuterSelected]}>
                       {deliveryType === 'agent_delivery' && <View style={styles.radioInner} />}
                     </View>
-                    <View>
-                      <Text style={styles.deliveryOptionTitle}>QuickWish Agent Delivery</Text>
-                      <Text style={styles.deliveryOptionDesc}>A nearby fulfillment agent will deliver</Text>
+                    <View style={styles.deliveryOptionInfo}>
+                      <Text style={styles.deliveryOptionTitle}>Independent Fulfillment Agent</Text>
+                      <Text style={styles.deliveryOptionDesc}>A nearby agent in your area will deliver</Text>
                     </View>
                   </View>
                   <Text style={styles.deliveryOptionPrice}>₹30</Text>
@@ -837,7 +952,7 @@ export default function ShopScreen() {
                   <View style={styles.agentDeliveryInfo}>
                     <Ionicons name="information-circle" size={18} color="#3B82F6" />
                     <Text style={styles.agentDeliveryText}>
-                      A QuickWish fulfillment agent in your area will pick up your order and deliver it. Track in real-time!
+                      An independent fulfillment agent nearby will pick up your order and deliver it to you. Track in real-time!
                     </Text>
                   </View>
                 )}
@@ -871,15 +986,59 @@ export default function ShopScreen() {
 
             <View style={styles.checkoutFooter}>
               <TouchableOpacity 
-                style={[styles.placeOrderButton, isPlacingOrder && styles.placeOrderButtonDisabled]} 
+                style={[styles.placeOrderButton, (isPlacingOrder || !deliveryAddress.trim()) && styles.placeOrderButtonDisabled]} 
                 onPress={placeOrder}
-                disabled={isPlacingOrder}
+                disabled={isPlacingOrder || !deliveryAddress.trim()}
               >
                 {isPlacingOrder ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.placeOrderText}>Place Order</Text>
                 )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Address Modal */}
+      <Modal visible={showAddAddressModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.addAddressModal}>
+            <View style={styles.cartHeader}>
+              <Text style={styles.cartTitle}>Add New Address</Text>
+              <TouchableOpacity onPress={() => setShowAddAddressModal(false)}>
+                <Ionicons name="close" size={24} color="#1F2937" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.addAddressContent}>
+              <Text style={styles.inputLabel}>Label</Text>
+              <TextInput
+                style={styles.labelInput}
+                placeholder="e.g., Home, Office, etc."
+                placeholderTextColor="#9CA3AF"
+                value={newAddressLabel}
+                onChangeText={setNewAddressLabel}
+              />
+
+              <Text style={styles.inputLabel}>Address</Text>
+              <TextInput
+                style={styles.addressInput}
+                placeholder="Enter your full address..."
+                placeholderTextColor="#9CA3AF"
+                value={newAddressText}
+                onChangeText={setNewAddressText}
+                multiline
+                numberOfLines={4}
+              />
+
+              <TouchableOpacity 
+                style={[styles.saveAddressButton, !newAddressText.trim() && styles.saveAddressButtonDisabled]}
+                onPress={addNewAddress}
+                disabled={!newAddressText.trim()}
+              >
+                <Text style={styles.saveAddressText}>Save Address</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -960,7 +1119,7 @@ export default function ShopScreen() {
                     color="#6B7280" 
                   />
                   <Text style={styles.invoiceDeliveryTypeText}>
-                    {placedOrder?.delivery_type === 'agent_delivery' ? 'QuickWish Agent Delivery' : 'Shop Delivery'}
+                    {placedOrder?.delivery_type === 'agent_delivery' ? 'Independent Fulfillment Agent' : 'Shop Delivery'}
                   </Text>
                 </View>
               </View>
@@ -1138,7 +1297,13 @@ const styles = StyleSheet.create({
   checkoutModal: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
   checkoutContent: { padding: 16 },
   checkoutSection: { marginBottom: 20 },
-  checkoutSectionTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937', marginBottom: 10 },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  checkoutSectionTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
+  addNewText: { fontSize: 13, fontWeight: '600', color: '#10B981' },
+  gpsButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF6FF', paddingVertical: 12, borderRadius: 10, marginBottom: 12, gap: 8 },
+  gpsButtonText: { fontSize: 14, fontWeight: '600', color: '#3B82F6' },
+  savedAddresses: { marginBottom: 12 },
+  orText: { fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginBottom: 8 },
   addressOption: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 12, borderRadius: 10, marginBottom: 8, borderWidth: 2, borderColor: 'transparent', gap: 12 },
   addressOptionSelected: { borderColor: '#10B981', backgroundColor: '#F0FDF4' },
   addressOptionContent: { flex: 1 },
@@ -1147,7 +1312,8 @@ const styles = StyleSheet.create({
   addressInput: { backgroundColor: '#F3F4F6', borderRadius: 10, padding: 12, fontSize: 14, color: '#1F2937', minHeight: 70, textAlignVertical: 'top' },
   deliveryOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 12, borderRadius: 10, marginBottom: 8, borderWidth: 2, borderColor: 'transparent' },
   deliveryOptionSelected: { borderColor: '#10B981', backgroundColor: '#F0FDF4' },
-  deliveryOptionLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  deliveryOptionLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  deliveryOptionInfo: { flex: 1 },
   radioOuter: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D1D5DB', justifyContent: 'center', alignItems: 'center' },
   radioOuterSelected: { borderColor: '#10B981' },
   radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981' },
@@ -1164,8 +1330,17 @@ const styles = StyleSheet.create({
   summaryTotalValue: { fontSize: 18, fontWeight: '700', color: '#10B981' },
   checkoutFooter: { padding: 16, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
   placeOrderButton: { backgroundColor: '#10B981', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  placeOrderButtonDisabled: { opacity: 0.7 },
+  placeOrderButtonDisabled: { opacity: 0.5 },
   placeOrderText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  
+  // Add Address Modal
+  addAddressModal: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '60%' },
+  addAddressContent: { padding: 16 },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: '#1F2937', marginBottom: 8 },
+  labelInput: { backgroundColor: '#F3F4F6', borderRadius: 10, padding: 12, fontSize: 14, color: '#1F2937', marginBottom: 16 },
+  saveAddressButton: { backgroundColor: '#10B981', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 16 },
+  saveAddressButtonDisabled: { opacity: 0.5 },
+  saveAddressText: { fontSize: 15, fontWeight: '700', color: '#fff' },
   
   // Invoice Modal
   invoiceOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
