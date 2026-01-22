@@ -10,7 +10,7 @@ import { useAuth } from '../_layout';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
-                   'https://quickwish-2.preview.emergentagent.com';
+                   'https://wishmarket.preview.emergentagent.com';
 
 export default function ProfileEditScreen() {
   const router = useRouter();
