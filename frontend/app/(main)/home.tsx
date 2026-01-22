@@ -221,7 +221,7 @@ export default function HomeScreen() {
             <Image source={{ uri: user.picture }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={20} color="#6366F1" />
+              <Ionicons name="person" size={20} color="#7C3AED" />
             </View>
           )}
           <View style={styles.greetingContainer}>
@@ -230,9 +230,9 @@ export default function HomeScreen() {
               e.stopPropagation();
               router.push('/location-picker');
             }}>
-              <Ionicons name="location" size={12} color="#6366F1" />
+              <Ionicons name="location" size={12} color="#7C3AED" />
               <Text style={styles.locationText} numberOfLines={1}>{displayLocation}</Text>
-              <Ionicons name="chevron-down" size={12} color="#6366F1" />
+              <Ionicons name="chevron-down" size={12} color="#7C3AED" />
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -241,7 +241,7 @@ export default function HomeScreen() {
           onPress={() => router.push('/wishbox')}
         >
           <View style={styles.wishboxIconContainer}>
-            <Ionicons name="file-tray-full" size={22} color="#6366F1" />
+            <Ionicons name="file-tray-full" size={22} color="#7C3AED" />
             {activeWishes.length > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{activeWishes.length}</Text>
