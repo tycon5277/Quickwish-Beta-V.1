@@ -1931,7 +1931,7 @@ const styles = StyleSheet.create({
   dealSummaryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
     paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
