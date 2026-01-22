@@ -131,11 +131,11 @@ const FEED_POSTS: FeedPost[] = [
   },
 ];
 
-// Creator type configurations
+// Creator type configurations - Updated with new color palette
 const CREATOR_CONFIG: Record<CreatorType, { label: string; color: string; bgColor: string; icon: string; gradient: string[] }> = {
-  agent: { label: 'Agent', color: '#10B981', bgColor: '#D1FAE5', icon: 'flash', gradient: ['#10B981', '#059669'] },
-  vendor: { label: 'Vendor', color: '#3B82F6', bgColor: '#DBEAFE', icon: 'storefront', gradient: ['#3B82F6', '#2563EB'] },
-  promoter: { label: 'Promoter', color: '#8B5CF6', bgColor: '#EDE9FE', icon: 'megaphone', gradient: ['#8B5CF6', '#7C3AED'] },
+  agent: { label: 'Agent', color: '#7C3AED', bgColor: '#E8D9F4', icon: 'flash', gradient: ['#9333EA', '#7C3AED'] },
+  vendor: { label: 'Vendor', color: '#0EA5E9', bgColor: '#D0E9F7', icon: 'storefront', gradient: ['#38BDF8', '#0EA5E9'] },
+  promoter: { label: 'Promoter', color: '#F59E0B', bgColor: '#FCE9C6', icon: 'megaphone', gradient: ['#FBBF24', '#F59E0B'] },
 };
 
 // Search filter categories
