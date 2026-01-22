@@ -1232,7 +1232,7 @@ const styles = StyleSheet.create({
   qtyBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
   qtyText: { fontSize: 14, fontWeight: '700', color: '#10B981', minWidth: 30, textAlign: 'center' },
   
-  bottomPadding: { height: 100 },
+  bottomPadding: { height: 140 },
   
   floatingCart: { position: 'absolute', bottom: 20, left: 16, right: 16, backgroundColor: '#10B981', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   floatingCartLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
