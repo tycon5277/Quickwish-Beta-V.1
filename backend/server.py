@@ -100,6 +100,62 @@ class Message(BaseModel):
 class MessageCreate(BaseModel):
     content: str
 
+# ===================== LOCAL HUB MODELS =====================
+
+class HubVendor(BaseModel):
+    vendor_id: str
+    name: str
+    description: str
+    category: str  # grocery, restaurant, pharmacy, electronics, fashion, etc.
+    image: str
+    rating: float = 0.0
+    total_ratings: int = 0
+    location: dict  # {lat, lng, address}
+    contact_phone: Optional[str] = None
+    opening_hours: str = "9:00 AM - 9:00 PM"
+    has_own_delivery: bool = False
+    delivery_radius_km: float = 5.0
+    is_verified: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Product(BaseModel):
+    product_id: str
+    vendor_id: str
+    name: str
+    description: str
+    price: float
+    discounted_price: Optional[float] = None
+    images: List[str] = []
+    category: str
+    stock: int = 100
+    likes: int = 0
+    rating: float = 0.0
+    total_ratings: int = 0
+    is_available: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class CartItem(BaseModel):
+    product_id: str
+    quantity: int = 1
+
+class CartUpdate(BaseModel):
+    product_id: str
+    quantity: int
+
+class ShopOrder(BaseModel):
+    order_id: str
+    user_id: str
+    vendor_id: str
+    items: List[dict]  # [{product_id, name, price, quantity}]
+    total_amount: float
+    delivery_address: dict
+    delivery_type: str  # "shop_delivery" or "agent_delivery"
+    delivery_fee: float = 0.0
+    assigned_agent_id: Optional[str] = None
+    status: str = "pending"  # pending, confirmed, preparing, ready, out_for_delivery, delivered, cancelled
+    payment_status: str = "pending"  # pending, paid, failed
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 class LocalBusiness(BaseModel):
     business_id: str
     name: str
