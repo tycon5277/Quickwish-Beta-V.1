@@ -562,7 +562,7 @@ export default function CreateWishScreen() {
       
       {/* Title Input */}
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Title *</Text>
+        <Text style={styles.inputLabel}>My Wish *</Text>
         <TextInput
           style={styles.textInput}
           placeholder={getTitlePlaceholder()}
@@ -574,7 +574,7 @@ export default function CreateWishScreen() {
       
       {/* Description Input */}
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Description (Optional)</Text>
+        <Text style={styles.inputLabel}>Describe Your Wish (Optional)</Text>
         <TextInput
           style={[styles.textInput, styles.textArea]}
           placeholder="Add more details about your wish..."
