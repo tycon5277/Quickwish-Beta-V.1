@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Animated, Linking, Image, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Animated, Linking, Image, Modal, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +14,8 @@ const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ||
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
                    'https://wishmarket.preview.emergentagent.com';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 interface Message {
   message_id: string;
   room_id: string;
@@ -21,11 +23,18 @@ interface Message {
   sender_type: string;
   content: string;
   created_at: string;
-  type?: 'text' | 'image' | 'voice' | 'system';
+  type?: 'text' | 'image' | 'voice' | 'system' | 'offer';
   image_url?: string;
   voice_url?: string;
   voice_duration?: number;
   status?: 'sending' | 'sent' | 'delivered' | 'read';
+  offer_amount?: number;
+  offer_status?: 'pending' | 'accepted' | 'rejected';
+}
+
+interface VoiceMessage {
+  uri: string;
+  duration: number;
 }
 
 interface ChatRoom {
@@ -62,6 +71,15 @@ const QUICK_REPLIES = [
   { id: 'wait', text: 'Please wait, almost there', icon: 'hourglass' },
 ];
 
+// Cancel reasons
+const CANCEL_REASONS = [
+  { id: 'changed_mind', label: 'Changed my mind', icon: 'refresh' },
+  { id: 'found_alternative', label: 'Found alternative', icon: 'swap-horizontal' },
+  { id: 'price_issue', label: 'Price too high', icon: 'cash' },
+  { id: 'time_issue', label: 'Taking too long', icon: 'time' },
+  { id: 'other', label: 'Other reason', icon: 'ellipsis-horizontal' },
+];
+
 // Deal progress steps
 const PROGRESS_STEPS = [
   { id: 'negotiating', label: 'Negotiating', icon: 'chatbubble-ellipses' },
@@ -91,9 +109,11 @@ export default function ChatDetailScreen() {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingTimer = useRef<NodeJS.Timeout | null>(null);
   
-  // Voice playback states
+  // Voice playback states - Store voice messages locally
+  const [voiceMessages, setVoiceMessages] = useState<Record<string, VoiceMessage>>({});
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [playbackProgress, setPlaybackProgress] = useState(0);
+  const soundRef = useRef<Audio.Sound | null>(null);
   
   // Image preview
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -101,6 +121,17 @@ export default function ChatDetailScreen() {
   // Typing indicator
   const [isAgentTyping, setIsAgentTyping] = useState(false);
   const typingAnimation = useRef(new Animated.Value(0)).current;
+  
+  // Phase 3: Modals
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [showMenuModal, setShowMenuModal] = useState(false);
+  const [offerAmount, setOfferAmount] = useState('');
+  const [selectedCancelReason, setSelectedCancelReason] = useState<string | null>(null);
+  
+  // Phase 3: ETA Timer
+  const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
   
   const agentInfoHeight = useRef(new Animated.Value(0)).current;
 
@@ -129,13 +160,23 @@ export default function ChatDetailScreen() {
     }
   }, [isAgentTyping]);
 
+  // Simulate ETA for approved deals
+  useEffect(() => {
+    if (room?.status === 'approved' || room?.status === 'in_progress') {
+      setEtaMinutes(Math.floor(Math.random() * 20) + 5);
+      const interval = setInterval(() => {
+        setEtaMinutes(prev => prev && prev > 1 ? prev - 1 : prev);
+      }, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [room?.status]);
+
   const fetchMessages = useCallback(async () => {
     if (!sessionToken || !id) return;
     try {
       const response = await axios.get(`${BACKEND_URL}/api/chat/rooms/${id}/messages`, {
         headers: { Authorization: `Bearer ${sessionToken}` }
       });
-      // Add mock status to messages for demo
       const enhancedMessages = response.data.map((msg: Message, idx: number) => ({
         ...msg,
         status: idx === response.data.length - 1 ? 'delivered' : 'read',
@@ -189,14 +230,14 @@ export default function ChatDetailScreen() {
   // Cleanup audio on unmount
   useEffect(() => {
     return () => {
-      if (sound) {
-        sound.unloadAsync();
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
       }
       if (recording) {
         recording.stopAndUnloadAsync();
       }
     };
-  }, [sound, recording]);
+  }, [recording]);
 
   const toggleAgentInfo = () => {
     const toValue = showAgentInfo ? 0 : 1;
@@ -208,17 +249,27 @@ export default function ChatDetailScreen() {
     setShowAgentInfo(!showAgentInfo);
   };
 
-  const sendMessage = async (text?: string, type: 'text' | 'image' | 'voice' = 'text', mediaUrl?: string, duration?: number) => {
+  const sendMessage = async (text?: string, type: 'text' | 'image' | 'voice' | 'offer' = 'text', mediaData?: any) => {
     const messageText = text || newMessage.trim();
     if ((!messageText && type === 'text') || !sessionToken || !id) return;
     
     setIsSending(true);
     try {
-      await axios.post(
+      const response = await axios.post(
         `${BACKEND_URL}/api/chat/rooms/${id}/messages`,
         { content: messageText || `[${type}]` },
         { headers: { Authorization: `Bearer ${sessionToken}` } }
       );
+      
+      // If it's a voice message, store the URI locally
+      if (type === 'voice' && mediaData) {
+        const newMessageId = response.data?.message_id || `voice_${Date.now()}`;
+        setVoiceMessages(prev => ({
+          ...prev,
+          [newMessageId]: mediaData
+        }));
+      }
+      
       setNewMessage('');
       setShowQuickReplies(false);
       setShowAttachmentOptions(false);
@@ -253,7 +304,6 @@ export default function ChatDetailScreen() {
       setIsRecording(true);
       setRecordingDuration(0);
       
-      // Start duration timer
       recordingTimer.current = setInterval(() => {
         setRecordingDuration(prev => {
           if (prev >= 30) {
@@ -282,11 +332,21 @@ export default function ChatDetailScreen() {
       setIsRecording(false);
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
+      const duration = recordingDuration;
       setRecording(null);
       
-      if (uri && recordingDuration >= 1) {
-        // Send voice message
-        await sendMessage(`🎤 Voice message (${recordingDuration}s)`, 'voice', uri, recordingDuration);
+      if (uri && duration >= 1) {
+        // Create a temporary message ID for the voice message
+        const tempId = `voice_${Date.now()}`;
+        
+        // Store the voice message locally first
+        setVoiceMessages(prev => ({
+          ...prev,
+          [tempId]: { uri, duration }
+        }));
+        
+        // Send the message
+        await sendMessage(`🎤 Voice message (${duration}s)`, 'voice', { uri, duration });
       }
       
       setRecordingDuration(0);
@@ -313,22 +373,82 @@ export default function ChatDetailScreen() {
     }
   };
 
-  // Voice Playback Functions
-  const playVoiceMessage = async (messageId: string) => {
-    // For demo, just show playing state
-    if (playingVoice === messageId) {
-      if (sound) {
-        await sound.stopAsync();
-        await sound.unloadAsync();
-        setSound(null);
-      }
-      setPlayingVoice(null);
-    } else {
-      setPlayingVoice(messageId);
-      // Simulate playback duration
-      setTimeout(() => {
+  // Voice Playback Functions - FIXED
+  const playVoiceMessage = async (messageId: string, messageContent: string) => {
+    try {
+      // If already playing this message, stop it
+      if (playingVoice === messageId) {
+        if (soundRef.current) {
+          await soundRef.current.stopAsync();
+          await soundRef.current.unloadAsync();
+          soundRef.current = null;
+        }
         setPlayingVoice(null);
-      }, 3000);
+        setPlaybackProgress(0);
+        return;
+      }
+
+      // Stop any currently playing audio
+      if (soundRef.current) {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+
+      // Check if we have the voice message stored locally
+      const voiceData = voiceMessages[messageId];
+      
+      if (voiceData && voiceData.uri) {
+        // Play from local storage
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+        });
+
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: voiceData.uri },
+          { shouldPlay: true },
+          (status) => {
+            if (status.isLoaded) {
+              if (status.didJustFinish) {
+                setPlayingVoice(null);
+                setPlaybackProgress(0);
+              } else if (status.positionMillis && status.durationMillis) {
+                setPlaybackProgress(status.positionMillis / status.durationMillis);
+              }
+            }
+          }
+        );
+        
+        soundRef.current = sound;
+        setPlayingVoice(messageId);
+      } else {
+        // For demo purposes, play a sample audio or show message
+        Alert.alert(
+          'Voice Message',
+          'Voice playback demo: The recorded audio would play here.\n\nIn production, voice files would be uploaded to server and streamed back.',
+          [{ text: 'OK' }]
+        );
+        
+        // Simulate playback animation
+        setPlayingVoice(messageId);
+        const durationMatch = messageContent.match(/\((\d+)s\)/);
+        const duration = durationMatch ? parseInt(durationMatch[1]) * 1000 : 3000;
+        
+        let progress = 0;
+        const interval = setInterval(() => {
+          progress += 100 / (duration / 100);
+          setPlaybackProgress(progress / 100);
+          if (progress >= 100) {
+            clearInterval(interval);
+            setPlayingVoice(null);
+            setPlaybackProgress(0);
+          }
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error playing voice message:', error);
+      Alert.alert('Error', 'Failed to play voice message');
     }
   };
 
@@ -382,6 +502,60 @@ export default function ChatDetailScreen() {
     setShowAttachmentOptions(false);
   };
 
+  // Phase 3: Send Offer
+  const sendOffer = async () => {
+    const amount = parseFloat(offerAmount);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid offer amount');
+      return;
+    }
+    
+    await sendMessage(`💰 Counter Offer: ₹${amount}`, 'offer', { amount });
+    setShowOfferModal(false);
+    setOfferAmount('');
+  };
+
+  // Phase 3: Cancel Deal
+  const cancelDeal = async () => {
+    if (!selectedCancelReason) {
+      Alert.alert('Select Reason', 'Please select a reason for cancellation');
+      return;
+    }
+    
+    const reason = CANCEL_REASONS.find(r => r.id === selectedCancelReason);
+    Alert.alert(
+      'Confirm Cancellation',
+      `Are you sure you want to cancel this wish?\n\nReason: ${reason?.label}`,
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // In production, call API to cancel
+              await sendMessage(`❌ Wish cancelled: ${reason?.label}`, 'system');
+              setShowCancelModal(false);
+              Alert.alert('Cancelled', 'Your wish has been cancelled.');
+              router.back();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to cancel wish');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Phase 3: Report User
+  const reportUser = () => {
+    Alert.alert(
+      'Report Submitted',
+      'Thank you for your report. Our team will review it within 24 hours.',
+      [{ text: 'OK', onPress: () => setShowReportModal(false) }]
+    );
+  };
+
   const approveDeal = async () => {
     Alert.alert(
       '✅ Approve Deal',
@@ -424,6 +598,21 @@ export default function ChatDetailScreen() {
 
   const handlePayment = () => {
     Alert.alert('Payment', 'Payment feature will be available soon!');
+  };
+
+  const handleEmergency = () => {
+    Alert.alert(
+      '🆘 Emergency SOS',
+      'This will alert emergency services and share your location.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Call Emergency', 
+          style: 'destructive',
+          onPress: () => Linking.openURL('tel:112')
+        }
+      ]
+    );
   };
 
   const formatTime = (dateStr: string) => {
@@ -491,7 +680,45 @@ export default function ChatDetailScreen() {
   const renderMessage = (message: Message, isOwn: boolean) => {
     const isVoice = message.content.includes('🎤 Voice message');
     const isImage = message.content.includes('📷');
+    const isOffer = message.content.includes('💰 Counter Offer');
+    const isSystem = message.content.includes('❌') || message.content.includes('✅');
     
+    // Offer Card (Phase 3)
+    if (isOffer) {
+      const amountMatch = message.content.match(/₹(\d+)/);
+      const amount = amountMatch ? amountMatch[1] : '0';
+      
+      return (
+        <View style={styles.offerCard}>
+          <View style={styles.offerHeader}>
+            <Ionicons name="cash" size={20} color="#F59E0B" />
+            <Text style={styles.offerTitle}>Counter Offer</Text>
+          </View>
+          <Text style={styles.offerAmount}>₹{amount}</Text>
+          {!isOwn && (
+            <View style={styles.offerActions}>
+              <TouchableOpacity style={styles.offerRejectButton}>
+                <Text style={styles.offerRejectText}>Reject</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.offerAcceptButton}>
+                <Text style={styles.offerAcceptText}>Accept</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      );
+    }
+    
+    // System Message
+    if (isSystem) {
+      return (
+        <View style={styles.systemMessage}>
+          <Text style={styles.systemMessageText}>{message.content}</Text>
+        </View>
+      );
+    }
+    
+    // Voice Message
     if (isVoice) {
       const durationMatch = message.content.match(/\((\d+)s\)/);
       const duration = durationMatch ? parseInt(durationMatch[1]) : 0;
@@ -500,9 +727,9 @@ export default function ChatDetailScreen() {
       return (
         <TouchableOpacity 
           style={[styles.voiceMessage, isOwn ? styles.voiceMessageOwn : styles.voiceMessageOther]}
-          onPress={() => playVoiceMessage(message.message_id)}
+          onPress={() => playVoiceMessage(message.message_id, message.content)}
         >
-          <View style={styles.voicePlayButton}>
+          <View style={[styles.voicePlayButton, isOwn && styles.voicePlayButtonOwn]}>
             <Ionicons 
               name={isPlaying ? "pause" : "play"} 
               size={20} 
@@ -510,26 +737,33 @@ export default function ChatDetailScreen() {
             />
           </View>
           <View style={styles.voiceWaveform}>
-            {[...Array(12)].map((_, i) => (
-              <View 
-                key={i} 
-                style={[
-                  styles.voiceBar, 
-                  { 
-                    height: 8 + Math.random() * 16,
-                    backgroundColor: isOwn ? 'rgba(255,255,255,0.6)' : '#C7D2FE',
-                  }
-                ]} 
-              />
-            ))}
+            {[...Array(15)].map((_, i) => {
+              const barProgress = i / 15;
+              const isActive = isPlaying && barProgress <= playbackProgress;
+              return (
+                <View 
+                  key={i} 
+                  style={[
+                    styles.voiceBar, 
+                    { 
+                      height: 8 + Math.sin(i * 0.8) * 12 + Math.random() * 4,
+                      backgroundColor: isOwn 
+                        ? (isActive ? '#fff' : 'rgba(255,255,255,0.4)') 
+                        : (isActive ? '#6366F1' : '#C7D2FE'),
+                    }
+                  ]} 
+                />
+              );
+            })}
           </View>
           <Text style={[styles.voiceDuration, isOwn && styles.voiceDurationOwn]}>
-            {duration}s
+            {isPlaying ? `${Math.floor(playbackProgress * duration)}s` : `${duration}s`}
           </Text>
         </TouchableOpacity>
       );
     }
 
+    // Image Message
     if (isImage) {
       return (
         <TouchableOpacity 
@@ -597,7 +831,7 @@ export default function ChatDetailScreen() {
           />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuButton}>
+        <TouchableOpacity style={styles.menuButton} onPress={() => setShowMenuModal(true)}>
           <Ionicons name="ellipsis-vertical" size={20} color="#6B7280" />
         </TouchableOpacity>
       </View>
@@ -666,6 +900,14 @@ export default function ChatDetailScreen() {
         </View>
       </View>
 
+      {/* ETA Timer (Phase 3) */}
+      {etaMinutes && (room?.status === 'approved' || room?.status === 'in_progress') && (
+        <View style={styles.etaBanner}>
+          <Ionicons name="time" size={18} color="#10B981" />
+          <Text style={styles.etaText}>Estimated arrival: <Text style={styles.etaTime}>{etaMinutes} mins</Text></Text>
+        </View>
+      )}
+
       {/* Quick Actions Bar */}
       <View style={styles.quickActionsBar}>
         <TouchableOpacity style={styles.quickAction} onPress={handleCall}>
@@ -682,12 +924,21 @@ export default function ChatDetailScreen() {
           <Text style={styles.quickActionText}>Location</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.quickAction} onPress={handlePayment}>
-          <View style={[styles.quickActionIcon, { backgroundColor: '#FEF3C7' }]}>
-            <Ionicons name="wallet" size={18} color="#F59E0B" />
-          </View>
-          <Text style={styles.quickActionText}>Pay</Text>
-        </TouchableOpacity>
+        {room?.status === 'active' ? (
+          <TouchableOpacity style={styles.quickAction} onPress={() => setShowOfferModal(true)}>
+            <View style={[styles.quickActionIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="cash" size={18} color="#F59E0B" />
+            </View>
+            <Text style={styles.quickActionText}>Offer</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.quickAction} onPress={handlePayment}>
+            <View style={[styles.quickActionIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="wallet" size={18} color="#F59E0B" />
+            </View>
+            <Text style={styles.quickActionText}>Pay</Text>
+          </TouchableOpacity>
+        )}
         
         {room?.status === 'active' && (
           <TouchableOpacity style={styles.quickAction} onPress={approveDeal}>
@@ -736,6 +987,32 @@ export default function ChatDetailScreen() {
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
           >
+            {/* Deal Summary Card (Phase 3) */}
+            {room?.wish && (
+              <View style={styles.dealSummaryCard}>
+                <View style={styles.dealSummaryHeader}>
+                  <Ionicons name="document-text" size={18} color="#6366F1" />
+                  <Text style={styles.dealSummaryTitle}>Deal Summary</Text>
+                </View>
+                <View style={styles.dealSummaryRow}>
+                  <Text style={styles.dealSummaryLabel}>Wish</Text>
+                  <Text style={styles.dealSummaryValue}>{room.wish.title}</Text>
+                </View>
+                <View style={styles.dealSummaryRow}>
+                  <Text style={styles.dealSummaryLabel}>Agreed Price</Text>
+                  <Text style={styles.dealSummaryPrice}>₹{room.wish.remuneration}</Text>
+                </View>
+                <View style={styles.dealSummaryRow}>
+                  <Text style={styles.dealSummaryLabel}>Status</Text>
+                  <View style={[styles.dealStatusBadge, { backgroundColor: room.status === 'completed' ? '#D1FAE5' : '#DBEAFE' }]}>
+                    <Text style={[styles.dealStatusText, { color: room.status === 'completed' ? '#10B981' : '#3B82F6' }]}>
+                      {room.status.replace('_', ' ').toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
             {Object.entries(groupedMessages).map(([date, msgs]) => (
               <View key={date}>
                 <View style={styles.dateSeparator}>
@@ -745,6 +1022,16 @@ export default function ChatDetailScreen() {
                 </View>
                 {msgs.map((message) => {
                   const isOwn = message.sender_id === user?.user_id;
+                  const isSystem = message.content.includes('❌') || message.content.includes('✅');
+                  
+                  if (isSystem) {
+                    return (
+                      <View key={message.message_id} style={styles.systemMessageContainer}>
+                        {renderMessage(message, isOwn)}
+                      </View>
+                    );
+                  }
+                  
                   return (
                     <View
                       key={message.message_id}
@@ -800,7 +1087,7 @@ export default function ChatDetailScreen() {
           </View>
         )}
 
-        {/* Attachment Options Modal */}
+        {/* Attachment Options */}
         {showAttachmentOptions && (
           <View style={styles.attachmentOptions}>
             <TouchableOpacity style={styles.attachmentOption} onPress={takePhoto}>
@@ -921,6 +1208,150 @@ export default function ChatDetailScreen() {
               resizeMode="contain"
             />
           )}
+        </View>
+      </Modal>
+
+      {/* Menu Modal (Phase 3) */}
+      <Modal visible={showMenuModal} transparent animationType="fade">
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMenuModal(false)}
+        >
+          <View style={styles.menuModal}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenuModal(false); setShowReportModal(true); }}>
+              <Ionicons name="flag" size={22} color="#EF4444" />
+              <Text style={styles.menuItemText}>Report User</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenuModal(false); Alert.alert('Blocked', 'User has been blocked'); }}>
+              <Ionicons name="ban" size={22} color="#EF4444" />
+              <Text style={styles.menuItemText}>Block User</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setShowMenuModal(false); setShowCancelModal(true); }}>
+              <Ionicons name="close-circle" size={22} color="#F59E0B" />
+              <Text style={styles.menuItemText}>Cancel Wish</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity style={styles.menuItem} onPress={handleEmergency}>
+              <Ionicons name="warning" size={22} color="#EF4444" />
+              <Text style={[styles.menuItemText, { color: '#EF4444' }]}>Emergency SOS</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Cancel Modal (Phase 3) */}
+      <Modal visible={showCancelModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.cancelModal}>
+            <Text style={styles.cancelModalTitle}>Cancel Wish</Text>
+            <Text style={styles.cancelModalSubtitle}>Please select a reason:</Text>
+            
+            {CANCEL_REASONS.map((reason) => (
+              <TouchableOpacity
+                key={reason.id}
+                style={[
+                  styles.cancelReasonItem,
+                  selectedCancelReason === reason.id && styles.cancelReasonItemSelected
+                ]}
+                onPress={() => setSelectedCancelReason(reason.id)}
+              >
+                <Ionicons 
+                  name={reason.icon as any} 
+                  size={20} 
+                  color={selectedCancelReason === reason.id ? '#6366F1' : '#6B7280'} 
+                />
+                <Text style={[
+                  styles.cancelReasonText,
+                  selectedCancelReason === reason.id && styles.cancelReasonTextSelected
+                ]}>
+                  {reason.label}
+                </Text>
+                {selectedCancelReason === reason.id && (
+                  <Ionicons name="checkmark-circle" size={20} color="#6366F1" />
+                )}
+              </TouchableOpacity>
+            ))}
+            
+            <View style={styles.cancelModalActions}>
+              <TouchableOpacity 
+                style={styles.cancelModalButton}
+                onPress={() => setShowCancelModal(false)}
+              >
+                <Text style={styles.cancelModalButtonText}>Go Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.cancelModalButton, styles.cancelModalButtonDanger]}
+                onPress={cancelDeal}
+              >
+                <Text style={styles.cancelModalButtonTextDanger}>Cancel Wish</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Offer Modal (Phase 3) */}
+      <Modal visible={showOfferModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.offerModal}>
+            <Text style={styles.offerModalTitle}>Make a Counter Offer</Text>
+            <Text style={styles.offerModalSubtitle}>Current price: ₹{room?.wish?.remuneration}</Text>
+            
+            <View style={styles.offerInputContainer}>
+              <Text style={styles.offerCurrency}>₹</Text>
+              <TextInput
+                style={styles.offerInput}
+                placeholder="Enter amount"
+                placeholderTextColor="#9CA3AF"
+                value={offerAmount}
+                onChangeText={setOfferAmount}
+                keyboardType="numeric"
+              />
+            </View>
+            
+            <View style={styles.offerModalActions}>
+              <TouchableOpacity 
+                style={styles.offerModalButton}
+                onPress={() => setShowOfferModal(false)}
+              >
+                <Text style={styles.offerModalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.offerModalButton, styles.offerModalButtonPrimary]}
+                onPress={sendOffer}
+              >
+                <Text style={styles.offerModalButtonTextPrimary}>Send Offer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Report Modal (Phase 3) */}
+      <Modal visible={showReportModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.reportModal}>
+            <Text style={styles.reportModalTitle}>Report User</Text>
+            <Text style={styles.reportModalSubtitle}>
+              Why are you reporting {room?.agent?.name}?
+            </Text>
+            
+            {['Inappropriate behavior', 'Scam or fraud', 'Harassment', 'Did not show up', 'Other'].map((reason) => (
+              <TouchableOpacity key={reason} style={styles.reportReasonItem}>
+                <Text style={styles.reportReasonText}>{reason}</Text>
+                <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+            ))}
+            
+            <TouchableOpacity 
+              style={styles.reportCloseButton}
+              onPress={() => setShowReportModal(false)}
+            >
+              <Text style={styles.reportCloseButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -1108,6 +1539,23 @@ const styles = StyleSheet.create({
   progressLineCompleted: {
     backgroundColor: '#10B981',
   },
+  // ETA Banner (Phase 3)
+  etaBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D1FAE5',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+  },
+  etaText: {
+    fontSize: 13,
+    color: '#065F46',
+    marginLeft: 8,
+  },
+  etaTime: {
+    fontWeight: '700',
+  },
   quickActionsBar: {
     flexDirection: 'row',
     backgroundColor: '#fff',
@@ -1207,6 +1655,60 @@ const styles = StyleSheet.create({
   messagesContent: {
     padding: 16,
   },
+  // Deal Summary Card (Phase 3)
+  dealSummaryCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  dealSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dealSummaryTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginLeft: 8,
+  },
+  dealSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  dealSummaryLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  dealSummaryValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1F2937',
+    flex: 1,
+    textAlign: 'right',
+  },
+  dealSummaryPrice: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#10B981',
+  },
+  dealStatusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  dealStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
   dateSeparator: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1271,28 +1773,99 @@ const styles = StyleSheet.create({
   messageTimeOwn: {
     color: 'rgba(255,255,255,0.7)',
   },
+  // Offer Card (Phase 3)
+  offerCard: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 12,
+    minWidth: 180,
+  },
+  offerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  offerTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#92400E',
+    marginLeft: 6,
+  },
+  offerAmount: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#92400E',
+    marginBottom: 10,
+  },
+  offerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  offerRejectButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+  },
+  offerRejectText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  offerAcceptButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+  },
+  offerAcceptText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  // System Message
+  systemMessageContainer: {
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  systemMessage: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  systemMessageText: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
   // Voice Message Styles
   voiceMessage: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 4,
+    minWidth: 180,
   },
   voiceMessageOwn: {},
   voiceMessageOther: {},
   voicePlayButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
+  },
+  voicePlayButtonOwn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   voiceWaveform: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    height: 24,
+    height: 28,
     gap: 2,
   },
   voiceBar: {
@@ -1303,6 +1876,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
     marginLeft: 8,
+    minWidth: 25,
   },
   voiceDurationOwn: {
     color: 'rgba(255,255,255,0.7)',
@@ -1510,6 +2084,219 @@ const styles = StyleSheet.create({
     backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  // Menu Modal
+  menuModal: {
+    position: 'absolute',
+    top: 100,
+    right: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingVertical: 8,
+    minWidth: 180,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  menuItemText: {
+    fontSize: 15,
+    color: '#1F2937',
+    marginLeft: 12,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 4,
+  },
+  // Cancel Modal
+  cancelModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+  },
+  cancelModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    textAlign: 'center',
+  },
+  cancelModalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  cancelReasonItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: '#F9FAFB',
+  },
+  cancelReasonItemSelected: {
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#6366F1',
+  },
+  cancelReasonText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#1F2937',
+    marginLeft: 12,
+  },
+  cancelReasonTextSelected: {
+    color: '#6366F1',
+    fontWeight: '600',
+  },
+  cancelModalActions: {
+    flexDirection: 'row',
+    marginTop: 20,
+    gap: 12,
+  },
+  cancelModalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+  },
+  cancelModalButtonDanger: {
+    backgroundColor: '#FEE2E2',
+  },
+  cancelModalButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  cancelModalButtonTextDanger: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#EF4444',
+  },
+  // Offer Modal
+  offerModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+  },
+  offerModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    textAlign: 'center',
+  },
+  offerModalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  offerInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  offerCurrency: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  offerInput: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#1F2937',
+    paddingVertical: 16,
+    marginLeft: 8,
+  },
+  offerModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  offerModalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+  },
+  offerModalButtonPrimary: {
+    backgroundColor: '#6366F1',
+  },
+  offerModalButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  offerModalButtonTextPrimary: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  // Report Modal
+  reportModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+  },
+  reportModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    textAlign: 'center',
+  },
+  reportModalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  reportReasonItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  reportReasonText: {
+    fontSize: 15,
+    color: '#1F2937',
+  },
+  reportCloseButton: {
+    marginTop: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  reportCloseButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   // Image Preview Modal
   imagePreviewModal: {
