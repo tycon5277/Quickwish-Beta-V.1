@@ -454,6 +454,19 @@ export default function ExploreScreen() {
               );
             })}
           </ScrollView>
+          
+          {/* Page Indicator Dots */}
+          <View style={styles.highlightIndicators}>
+            {sortedStories.map((_, index) => (
+              <View 
+                key={index}
+                style={[
+                  styles.highlightDotIndicator,
+                  currentHighlightIndex === index && styles.highlightDotActive
+                ]}
+              />
+            ))}
+          </View>
         </View>
 
         {/* Feed Section */}
