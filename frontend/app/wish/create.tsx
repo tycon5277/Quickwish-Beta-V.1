@@ -47,9 +47,9 @@ const WISH_TYPES = [
       { id: 'auto', label: 'Auto Rickshaw', icon: 'trail-sign' },
       { id: 'taxi_car', label: 'Taxi Car', icon: 'car' },
       { id: 'mini_bus', label: 'Mini Bus', icon: 'bus' },
-      { id: 'goods_small', label: 'Small Carrier', icon: 'cube' },
-      { id: 'goods_medium', label: 'Medium Carrier', icon: 'git-merge' },
-      { id: 'goods_large', label: 'Large Carrier', icon: 'train' }
+      { id: 'goods_small', label: 'Small Carrier', icon: 'cube', customIcon: 'single_box' },
+      { id: 'goods_medium', label: 'Medium Carrier', icon: 'apps', customIcon: 'pyramid_boxes' },
+      { id: 'goods_large', label: 'Large Carrier', icon: 'grid', customIcon: 'five_boxes' }
     ]
   },
   { 
