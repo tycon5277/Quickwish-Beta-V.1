@@ -536,6 +536,21 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 20,
   },
+  seedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 24,
+    gap: 8,
+  },
+  seedButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
   chatCard: {
     flexDirection: 'row',
     alignItems: 'center',
