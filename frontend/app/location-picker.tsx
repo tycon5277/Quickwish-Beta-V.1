@@ -329,10 +329,45 @@ export default function LocationPickerScreen() {
             iconAnchor: [15, 42],
           });
           
-          var marker = L.marker([${lat}, ${lng}], { 
+          // GPS location marker icon (blue pulsing dot)
+          var gpsIcon = L.divIcon({
+            className: 'gps-marker',
+            html: '<div class="gps-dot"><div class="gps-pulse"></div><div class="gps-center"></div></div>',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10],
+          });
+          
+          // Add GPS marker if available
+          var gpsLat = ${gpsLat};
+          var gpsLng = ${gpsLng};
+          var hasGPS = ${hasGPS};
+          var gpsMarker = null;
+          
+          if (hasGPS) {
+            gpsMarker = L.marker([gpsLat, gpsLng], { 
+              icon: gpsIcon,
+              interactive: false
+            }).addTo(map);
+          }
+          
+          // Draggable pin marker (red)
+          var marker = L.marker([${pinLat}, ${pinLng}], { 
             icon: customIcon,
             draggable: true 
           }).addTo(map);
+          
+          // Locate me function
+          function locateMe() {
+            if (hasGPS) {
+              map.setView([gpsLat, gpsLng], 16);
+              marker.setLatLng([gpsLat, gpsLng]);
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'locationSelected',
+                lat: gpsLat,
+                lng: gpsLng
+              }));
+            }
+          }
           
           // Handle marker drag
           marker.on('dragend', function(e) {
