@@ -632,7 +632,10 @@ export default function ShopScreen() {
 
       {/* Floating Cart Bar */}
       {getCartItemCount() > 0 && (
-        <TouchableOpacity style={styles.floatingCart} onPress={() => setShowCartModal(true)}>
+        <TouchableOpacity 
+          style={[styles.floatingCart, { bottom: Math.max(20, insets.bottom + 10) }]} 
+          onPress={() => setShowCartModal(true)}
+        >
           <View style={styles.floatingCartLeft}>
             <View style={styles.floatingCartBadge}>
               <Text style={styles.floatingCartBadgeText}>{getCartItemCount()}</Text>
