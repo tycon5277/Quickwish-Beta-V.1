@@ -653,96 +653,135 @@ async def like_product(product_id: str, current_user: User = Depends(require_aut
         raise HTTPException(status_code=404, detail="Product not found")
     return {"message": "Product liked"}
 
-# ===================== CART ENDPOINTS =====================
+# ===================== CART ENDPOINTS (Multi-Shop Support) =====================
 
 @api_router.get("/cart")
-async def get_cart(current_user: User = Depends(require_auth)):
-    """Get user's cart"""
-    cart = await db.carts.find_one({"user_id": current_user.user_id}, {"_id": 0})
-    if not cart:
-        return {"user_id": current_user.user_id, "items": [], "vendor_id": None}
-    
-    # Enrich with product details
-    enriched_items = []
-    for item in cart.get("items", []):
-        product = await db.products.find_one({"product_id": item["product_id"]}, {"_id": 0})
-        if product:
-            enriched_items.append({
-                **item,
-                "product": product
-            })
-    
-    cart["items"] = enriched_items
-    return cart
+async def get_cart(vendor_id: Optional[str] = None, current_user: User = Depends(require_auth)):
+    """Get user's cart for a specific vendor or all carts"""
+    if vendor_id:
+        # Get cart for specific vendor
+        cart = await db.carts.find_one(
+            {"user_id": current_user.user_id, "vendor_id": vendor_id}, 
+            {"_id": 0}
+        )
+        if not cart:
+            return {"user_id": current_user.user_id, "items": [], "vendor_id": vendor_id}
+        
+        # Enrich with product details
+        enriched_items = []
+        for item in cart.get("items", []):
+            product = await db.products.find_one({"product_id": item["product_id"]}, {"_id": 0})
+            if product:
+                enriched_items.append({**item, "product": product})
+        
+        cart["items"] = enriched_items
+        return cart
+    else:
+        # Get all carts for user
+        carts = await db.carts.find({"user_id": current_user.user_id}, {"_id": 0}).to_list(100)
+        enriched_carts = []
+        for cart in carts:
+            vendor = await db.hub_vendors.find_one({"vendor_id": cart.get("vendor_id")}, {"_id": 0})
+            enriched_items = []
+            for item in cart.get("items", []):
+                product = await db.products.find_one({"product_id": item["product_id"]}, {"_id": 0})
+                if product:
+                    enriched_items.append({**item, "product": product})
+            cart["items"] = enriched_items
+            cart["vendor"] = vendor
+            enriched_carts.append(cart)
+        return enriched_carts
+
+@api_router.get("/cart/summary")
+async def get_cart_summary(current_user: User = Depends(require_auth)):
+    """Get summary of all carts (vendor_id and item count)"""
+    carts = await db.carts.find({"user_id": current_user.user_id}, {"_id": 0}).to_list(100)
+    summary = {}
+    for cart in carts:
+        vendor_id = cart.get("vendor_id")
+        if vendor_id:
+            total_items = sum(item.get("quantity", 0) for item in cart.get("items", []))
+            summary[vendor_id] = total_items
+    return summary
 
 @api_router.post("/cart/add")
 async def add_to_cart(item: CartItem, current_user: User = Depends(require_auth)):
-    """Add item to cart"""
+    """Add item to cart (supports multi-shop carts)"""
     # Get product info
     product = await db.products.find_one({"product_id": item.product_id}, {"_id": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    # Get or create cart
-    cart = await db.carts.find_one({"user_id": current_user.user_id})
+    vendor_id = product["vendor_id"]
+    
+    # Get or create cart for this vendor
+    cart = await db.carts.find_one({"user_id": current_user.user_id, "vendor_id": vendor_id})
     
     if not cart:
-        # Create new cart
+        # Create new cart for this vendor
         cart = {
             "user_id": current_user.user_id,
-            "vendor_id": product["vendor_id"],
+            "vendor_id": vendor_id,
             "items": [{"product_id": item.product_id, "quantity": item.quantity}]
         }
         await db.carts.insert_one(cart)
     else:
-        # Check if same vendor
-        if cart.get("vendor_id") and cart["vendor_id"] != product["vendor_id"]:
-            raise HTTPException(
-                status_code=400, 
-                detail="Cannot add items from different vendors. Please clear cart first."
-            )
-        
         # Check if product already in cart
         existing_item = next((i for i in cart.get("items", []) if i["product_id"] == item.product_id), None)
         
         if existing_item:
             # Update quantity
             await db.carts.update_one(
-                {"user_id": current_user.user_id, "items.product_id": item.product_id},
+                {"user_id": current_user.user_id, "vendor_id": vendor_id, "items.product_id": item.product_id},
                 {"$inc": {"items.$.quantity": item.quantity}}
             )
         else:
             # Add new item
             await db.carts.update_one(
-                {"user_id": current_user.user_id},
-                {
-                    "$push": {"items": {"product_id": item.product_id, "quantity": item.quantity}},
-                    "$set": {"vendor_id": product["vendor_id"]}
-                }
+                {"user_id": current_user.user_id, "vendor_id": vendor_id},
+                {"$push": {"items": {"product_id": item.product_id, "quantity": item.quantity}}}
             )
     
-    return {"message": "Item added to cart"}
+    # Get updated cart count
+    updated_cart = await db.carts.find_one({"user_id": current_user.user_id, "vendor_id": vendor_id})
+    total_items = sum(i.get("quantity", 0) for i in updated_cart.get("items", []))
+    
+    return {"message": "Item added to cart", "cart_count": total_items, "vendor_id": vendor_id}
 
 @api_router.put("/cart/update")
 async def update_cart_item(item: CartUpdate, current_user: User = Depends(require_auth)):
     """Update cart item quantity"""
+    # Get product to find vendor
+    product = await db.products.find_one({"product_id": item.product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    vendor_id = product["vendor_id"]
+    
     if item.quantity <= 0:
         # Remove item
         await db.carts.update_one(
-            {"user_id": current_user.user_id},
+            {"user_id": current_user.user_id, "vendor_id": vendor_id},
             {"$pull": {"items": {"product_id": item.product_id}}}
         )
+        # Check if cart is empty and delete if so
+        cart = await db.carts.find_one({"user_id": current_user.user_id, "vendor_id": vendor_id})
+        if cart and len(cart.get("items", [])) == 0:
+            await db.carts.delete_one({"user_id": current_user.user_id, "vendor_id": vendor_id})
     else:
         await db.carts.update_one(
-            {"user_id": current_user.user_id, "items.product_id": item.product_id},
+            {"user_id": current_user.user_id, "vendor_id": vendor_id, "items.product_id": item.product_id},
             {"$set": {"items.$.quantity": item.quantity}}
         )
     return {"message": "Cart updated"}
 
 @api_router.delete("/cart/clear")
-async def clear_cart(current_user: User = Depends(require_auth)):
-    """Clear entire cart"""
-    await db.carts.delete_one({"user_id": current_user.user_id})
+async def clear_cart(vendor_id: Optional[str] = None, current_user: User = Depends(require_auth)):
+    """Clear cart for a specific vendor or all carts"""
+    if vendor_id:
+        await db.carts.delete_one({"user_id": current_user.user_id, "vendor_id": vendor_id})
+    else:
+        await db.carts.delete_many({"user_id": current_user.user_id})
     return {"message": "Cart cleared"}
 
 # ===================== SHOP ORDER ENDPOINTS =====================
