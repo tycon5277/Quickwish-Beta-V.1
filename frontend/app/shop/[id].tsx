@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, Modal, TextInput, Dimensions } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Modal, TextInput, Dimensions, Animated, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -52,23 +52,93 @@ interface CartItem {
   product?: Product;
 }
 
+interface UserAddress {
+  id: string;
+  label: string;
+  address: string;
+}
+
+// Toast Component
+const Toast = ({ visible, message, onHide }: { visible: boolean; message: string; onHide: () => void }) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(50)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]).start();
+
+      const timer = setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+          Animated.timing(translateY, { toValue: 50, duration: 200, useNativeDriver: true }),
+        ]).start(() => onHide());
+      }, 1500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View style={[styles.toast, { opacity, transform: [{ translateY }] }]}>
+      <Ionicons name="checkmark-circle" size={20} color="#fff" />
+      <Text style={styles.toastText}>{message}</Text>
+    </Animated.View>
+  );
+};
+
+// Confetti animation placeholder
+const Confetti = ({ visible }: { visible: boolean }) => {
+  if (!visible) return null;
+  return (
+    <View style={styles.confettiContainer}>
+      {[...Array(20)].map((_, i) => (
+        <Animated.View 
+          key={i} 
+          style={[
+            styles.confettiPiece, 
+            { 
+              left: `${Math.random() * 100}%`,
+              backgroundColor: ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'][i % 5],
+              transform: [{ rotate: `${Math.random() * 360}deg` }]
+            }
+          ]} 
+        />
+      ))}
+    </View>
+  );
+};
+
 export default function ShopScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { sessionToken } = useAuth();
+  const { sessionToken, user } = useAuth();
   
   const [vendor, setVendor] = useState<HubVendor | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartMap, setCartMap] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showProductModal, setShowProductModal] = useState(false);
   const [showCartModal, setShowCartModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [deliveryType, setDeliveryType] = useState<'shop_delivery' | 'agent_delivery'>('agent_delivery');
+  const [userAddresses, setUserAddresses] = useState<UserAddress[]>([]);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [placedOrder, setPlacedOrder] = useState<any>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
   const fetchVendor = useCallback(async () => {
     try {
@@ -93,12 +163,37 @@ export default function ShopScreen() {
   const fetchCart = useCallback(async () => {
     if (!sessionToken) return;
     try {
-      const response = await axios.get(`${BACKEND_URL}/api/cart`, {
+      const response = await axios.get(`${BACKEND_URL}/api/cart?vendor_id=${id}`, {
         headers: { Authorization: `Bearer ${sessionToken}` }
       });
-      setCart(response.data.items || []);
+      const items = response.data.items || [];
+      setCart(items);
+      
+      // Build cart map for quick lookup
+      const map: Record<string, number> = {};
+      items.forEach((item: CartItem) => {
+        map[item.product_id] = item.quantity;
+      });
+      setCartMap(map);
     } catch (error) {
       console.error('Error fetching cart:', error);
+    }
+  }, [sessionToken, id]);
+
+  const fetchUserAddresses = useCallback(async () => {
+    if (!sessionToken) return;
+    try {
+      const response = await axios.get(`${BACKEND_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${sessionToken}` }
+      });
+      setUserAddresses(response.data.addresses || []);
+      // Auto-select first address if available
+      if (response.data.addresses?.length > 0) {
+        setSelectedAddressId(response.data.addresses[0].id);
+        setDeliveryAddress(response.data.addresses[0].address);
+      }
+    } catch (error) {
+      console.error('Error fetching addresses:', error);
     }
   }, [sessionToken]);
 
@@ -106,7 +201,8 @@ export default function ShopScreen() {
     fetchVendor();
     fetchProducts();
     fetchCart();
-  }, [fetchVendor, fetchProducts, fetchCart]);
+    fetchUserAddresses();
+  }, [fetchVendor, fetchProducts, fetchCart, fetchUserAddresses]);
 
   const productCategories = ['all', ...new Set(products.map(p => p.category))];
   
@@ -114,9 +210,14 @@ export default function ShopScreen() {
     ? products 
     : products.filter(p => p.category === selectedCategory);
 
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+  };
+
   const addToCart = async (product: Product) => {
     if (!sessionToken) {
-      Alert.alert('Login Required', 'Please login to add items to cart.');
+      showToast('Please login to add items');
       return;
     }
 
@@ -126,9 +227,9 @@ export default function ShopScreen() {
         { headers: { Authorization: `Bearer ${sessionToken}` } }
       );
       await fetchCart();
-      Alert.alert('Added to Cart', `${product.name} added to your cart!`);
+      showToast(`${product.name.substring(0, 20)}... added`);
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to add to cart');
+      showToast(error.response?.data?.detail || 'Failed to add');
     }
   };
 
@@ -148,10 +249,11 @@ export default function ShopScreen() {
   const clearCart = async () => {
     if (!sessionToken) return;
     try {
-      await axios.delete(`${BACKEND_URL}/api/cart/clear`, {
+      await axios.delete(`${BACKEND_URL}/api/cart/clear?vendor_id=${id}`, {
         headers: { Authorization: `Bearer ${sessionToken}` }
       });
       setCart([]);
+      setCartMap({});
     } catch (error) {
       console.error('Error clearing cart:', error);
     }
@@ -159,19 +261,25 @@ export default function ShopScreen() {
 
   const placeOrder = async () => {
     if (!sessionToken) {
-      Alert.alert('Login Required', 'Please login to place an order.');
+      showToast('Please login to place order');
       return;
     }
 
     if (!deliveryAddress.trim()) {
-      Alert.alert('Address Required', 'Please enter a delivery address.');
+      showToast('Please enter delivery address');
       return;
     }
+
+    setIsPlacingOrder(true);
 
     try {
       const response = await axios.post(`${BACKEND_URL}/api/orders`,
         {
-          delivery_address: { address: deliveryAddress },
+          vendor_id: id,
+          delivery_address: { 
+            address: deliveryAddress,
+            label: selectedAddressId ? userAddresses.find(a => a.id === selectedAddressId)?.label : 'Delivery'
+          },
           delivery_type: deliveryType,
         },
         { headers: { Authorization: `Bearer ${sessionToken}` } }
@@ -179,13 +287,17 @@ export default function ShopScreen() {
       
       setShowCheckoutModal(false);
       setCart([]);
-      Alert.alert(
-        '🎉 Order Placed!',
-        `Order #${response.data.order_id.slice(-8)} placed successfully!\nTotal: ₹${response.data.grand_total}`,
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
+      setCartMap({});
+      setPlacedOrder(response.data.order);
+      setShowConfetti(true);
+      setShowInvoiceModal(true);
+      
+      // Hide confetti after animation
+      setTimeout(() => setShowConfetti(false), 3000);
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to place order');
+      showToast(error.response?.data?.detail || 'Failed to place order');
+    } finally {
+      setIsPlacingOrder(false);
     }
   };
 
@@ -210,6 +322,11 @@ export default function ShopScreen() {
     setShowProductModal(true);
   };
 
+  const handleAddressSelect = (addr: UserAddress) => {
+    setSelectedAddressId(addr.id);
+    setDeliveryAddress(addr.address);
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -223,6 +340,9 @@ export default function ShopScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Toast Notification */}
+      <Toast visible={toastVisible} message={toastMessage} onHide={() => setToastVisible(false)} />
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -285,10 +405,6 @@ export default function ShopScreen() {
               <Ionicons name="time-outline" size={18} color="#6B7280" />
               <Text style={styles.infoText}>{vendor.opening_hours}</Text>
             </View>
-            <View style={styles.infoRow}>
-              <Ionicons name="call-outline" size={18} color="#6B7280" />
-              <Text style={styles.infoText}>{vendor.contact_phone}</Text>
-            </View>
             <View style={styles.deliveryOptions}>
               {vendor.has_own_delivery && (
                 <View style={[styles.deliveryTag, { backgroundColor: '#D1FAE5' }]}>
@@ -329,66 +445,90 @@ export default function ShopScreen() {
             {filteredProducts.length} Product{filteredProducts.length !== 1 ? 's' : ''}
           </Text>
           <View style={styles.productsGrid}>
-            {filteredProducts.map((product) => (
-              <TouchableOpacity 
-                key={product.product_id} 
-                style={styles.productCard}
-                onPress={() => openProductDetails(product)}
-              >
-                {/* Product Image */}
-                <View style={styles.productImageContainer}>
-                  {product.images.length > 0 ? (
-                    <Image 
-                      source={{ uri: product.images[0] }} 
-                      style={styles.productImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={styles.productImagePlaceholder}>
-                      <Ionicons name="cube" size={30} color="#9CA3AF" />
-                    </View>
-                  )}
-                  {product.discounted_price && (
-                    <View style={styles.discountBadge}>
-                      <Text style={styles.discountText}>
-                        {Math.round((1 - product.discounted_price / product.price) * 100)}% OFF
-                      </Text>
-                    </View>
-                  )}
-                  {product.images.length > 1 && (
-                    <View style={styles.multiImageBadge}>
-                      <Ionicons name="images" size={12} color="#fff" />
-                      <Text style={styles.multiImageText}>{product.images.length}</Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Product Info */}
-                <View style={styles.productInfo}>
-                  <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-                  <View style={styles.productRating}>
-                    <Ionicons name="star" size={12} color="#F59E0B" />
-                    <Text style={styles.productRatingText}>{product.rating.toFixed(1)}</Text>
-                    <Text style={styles.productLikes}>• {product.likes} likes</Text>
-                  </View>
-                  <View style={styles.productPricing}>
-                    <Text style={styles.productPrice}>
-                      ₹{product.discounted_price || product.price}
-                    </Text>
+            {filteredProducts.map((product) => {
+              const inCart = cartMap[product.product_id] || 0;
+              
+              return (
+                <TouchableOpacity 
+                  key={product.product_id} 
+                  style={styles.productCard}
+                  onPress={() => openProductDetails(product)}
+                >
+                  {/* Product Image */}
+                  <View style={styles.productImageContainer}>
+                    {product.images.length > 0 ? (
+                      <Image 
+                        source={{ uri: product.images[0] }} 
+                        style={styles.productImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.productImagePlaceholder}>
+                        <Ionicons name="cube" size={30} color="#9CA3AF" />
+                      </View>
+                    )}
                     {product.discounted_price && (
-                      <Text style={styles.productOriginalPrice}>₹{product.price}</Text>
+                      <View style={styles.discountBadge}>
+                        <Text style={styles.discountText}>
+                          {Math.round((1 - product.discounted_price / product.price) * 100)}% OFF
+                        </Text>
+                      </View>
+                    )}
+                    {product.images.length > 1 && (
+                      <View style={styles.multiImageBadge}>
+                        <Ionicons name="images" size={12} color="#fff" />
+                        <Text style={styles.multiImageText}>{product.images.length}</Text>
+                      </View>
                     )}
                   </View>
-                  <TouchableOpacity 
-                    style={styles.addToCartButton}
-                    onPress={(e) => { e.stopPropagation(); addToCart(product); }}
-                  >
-                    <Ionicons name="add" size={18} color="#fff" />
-                    <Text style={styles.addToCartText}>Add</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            ))}
+
+                  {/* Product Info */}
+                  <View style={styles.productInfo}>
+                    <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
+                    <View style={styles.productRating}>
+                      <Ionicons name="star" size={12} color="#F59E0B" />
+                      <Text style={styles.productRatingText}>{product.rating.toFixed(1)}</Text>
+                      <Text style={styles.productLikes}>• {product.likes} likes</Text>
+                    </View>
+                    <View style={styles.productPricing}>
+                      <Text style={styles.productPrice}>
+                        ₹{product.discounted_price || product.price}
+                      </Text>
+                      {product.discounted_price && (
+                        <Text style={styles.productOriginalPrice}>₹{product.price}</Text>
+                      )}
+                    </View>
+                    
+                    {/* Add to Cart / Quantity Controls */}
+                    {inCart > 0 ? (
+                      <View style={styles.quantityControlsInline}>
+                        <TouchableOpacity 
+                          style={styles.qtyBtn}
+                          onPress={(e) => { e.stopPropagation(); updateCartItem(product.product_id, inCart - 1); }}
+                        >
+                          <Ionicons name="remove" size={16} color="#10B981" />
+                        </TouchableOpacity>
+                        <Text style={styles.qtyText}>{inCart}</Text>
+                        <TouchableOpacity 
+                          style={styles.qtyBtn}
+                          onPress={(e) => { e.stopPropagation(); updateCartItem(product.product_id, inCart + 1); }}
+                        >
+                          <Ionicons name="add" size={16} color="#10B981" />
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity 
+                        style={styles.addToCartButton}
+                        onPress={(e) => { e.stopPropagation(); addToCart(product); }}
+                      >
+                        <Ionicons name="add" size={18} color="#fff" />
+                        <Text style={styles.addToCartText}>Add</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -495,13 +635,31 @@ export default function ShopScreen() {
                 </ScrollView>
 
                 <View style={styles.modalActions}>
-                  <TouchableOpacity 
-                    style={styles.modalAddButton}
-                    onPress={() => { addToCart(selectedProduct); setShowProductModal(false); }}
-                  >
-                    <Ionicons name="cart" size={20} color="#fff" />
-                    <Text style={styles.modalAddText}>Add to Cart</Text>
-                  </TouchableOpacity>
+                  {cartMap[selectedProduct.product_id] > 0 ? (
+                    <View style={styles.modalQuantityControls}>
+                      <TouchableOpacity 
+                        style={styles.modalQtyBtn}
+                        onPress={() => updateCartItem(selectedProduct.product_id, cartMap[selectedProduct.product_id] - 1)}
+                      >
+                        <Ionicons name="remove" size={24} color="#10B981" />
+                      </TouchableOpacity>
+                      <Text style={styles.modalQtyText}>{cartMap[selectedProduct.product_id]} in cart</Text>
+                      <TouchableOpacity 
+                        style={styles.modalQtyBtn}
+                        onPress={() => updateCartItem(selectedProduct.product_id, cartMap[selectedProduct.product_id] + 1)}
+                      >
+                        <Ionicons name="add" size={24} color="#10B981" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity 
+                      style={styles.modalAddButton}
+                      onPress={() => { addToCart(selectedProduct); setShowProductModal(false); }}
+                    >
+                      <Ionicons name="cart" size={20} color="#fff" />
+                      <Text style={styles.modalAddText}>Add to Cart</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </>
             )}
@@ -595,15 +753,42 @@ export default function ShopScreen() {
             </View>
 
             <ScrollView style={styles.checkoutContent}>
+              {/* Saved Addresses */}
+              {userAddresses.length > 0 && (
+                <View style={styles.checkoutSection}>
+                  <Text style={styles.checkoutSectionTitle}>Saved Addresses</Text>
+                  {userAddresses.map((addr) => (
+                    <TouchableOpacity 
+                      key={addr.id}
+                      style={[styles.addressOption, selectedAddressId === addr.id && styles.addressOptionSelected]}
+                      onPress={() => handleAddressSelect(addr)}
+                    >
+                      <View style={[styles.radioOuter, selectedAddressId === addr.id && styles.radioOuterSelected]}>
+                        {selectedAddressId === addr.id && <View style={styles.radioInner} />}
+                      </View>
+                      <View style={styles.addressOptionContent}>
+                        <Text style={styles.addressLabel}>{addr.label}</Text>
+                        <Text style={styles.addressText}>{addr.address}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
               {/* Delivery Address */}
               <View style={styles.checkoutSection}>
-                <Text style={styles.checkoutSectionTitle}>Delivery Address</Text>
+                <Text style={styles.checkoutSectionTitle}>
+                  {userAddresses.length > 0 ? 'Or Enter New Address' : 'Delivery Address'}
+                </Text>
                 <TextInput
                   style={styles.addressInput}
                   placeholder="Enter your full delivery address..."
                   placeholderTextColor="#9CA3AF"
                   value={deliveryAddress}
-                  onChangeText={setDeliveryAddress}
+                  onChangeText={(text) => {
+                    setDeliveryAddress(text);
+                    setSelectedAddressId(null);
+                  }}
                   multiline
                   numberOfLines={3}
                 />
@@ -652,7 +837,7 @@ export default function ShopScreen() {
                   <View style={styles.agentDeliveryInfo}>
                     <Ionicons name="information-circle" size={18} color="#3B82F6" />
                     <Text style={styles.agentDeliveryText}>
-                      A QuickWish fulfillment agent in your area will pick up your order from the shop and deliver it to you. You can track the delivery in real-time.
+                      A QuickWish fulfillment agent in your area will pick up your order and deliver it. Track in real-time!
                     </Text>
                   </View>
                 )}
@@ -666,6 +851,10 @@ export default function ShopScreen() {
                   <Text style={styles.summaryValue}>₹{getCartTotal()}</Text>
                 </View>
                 <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>GST (5%)</Text>
+                  <Text style={styles.summaryValue}>₹{Math.round(getCartTotal() * 0.05)}</Text>
+                </View>
+                <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Delivery Fee</Text>
                   <Text style={styles.summaryValue}>
                     {deliveryType === 'shop_delivery' ? 'Free' : '₹30'}
@@ -674,15 +863,128 @@ export default function ShopScreen() {
                 <View style={[styles.summaryRow, styles.summaryTotal]}>
                   <Text style={styles.summaryTotalLabel}>Total</Text>
                   <Text style={styles.summaryTotalValue}>
-                    ₹{getCartTotal() + (deliveryType === 'agent_delivery' ? 30 : 0)}
+                    ₹{getCartTotal() + Math.round(getCartTotal() * 0.05) + (deliveryType === 'agent_delivery' ? 30 : 0)}
                   </Text>
                 </View>
               </View>
             </ScrollView>
 
             <View style={styles.checkoutFooter}>
-              <TouchableOpacity style={styles.placeOrderButton} onPress={placeOrder}>
-                <Text style={styles.placeOrderText}>Place Order</Text>
+              <TouchableOpacity 
+                style={[styles.placeOrderButton, isPlacingOrder && styles.placeOrderButtonDisabled]} 
+                onPress={placeOrder}
+                disabled={isPlacingOrder}
+              >
+                {isPlacingOrder ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.placeOrderText}>Place Order</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Invoice Modal */}
+      <Modal visible={showInvoiceModal} animationType="fade" transparent>
+        <View style={styles.invoiceOverlay}>
+          <Confetti visible={showConfetti} />
+          <View style={styles.invoiceModal}>
+            <View style={styles.invoiceHeader}>
+              <View style={styles.successIcon}>
+                <Ionicons name="checkmark" size={40} color="#fff" />
+              </View>
+              <Text style={styles.invoiceTitle}>Order Placed! 🎉</Text>
+              <Text style={styles.invoiceOrderId}>#{placedOrder?.order_id?.slice(-8)}</Text>
+            </View>
+
+            <ScrollView style={styles.invoiceContent}>
+              {/* Shop Details */}
+              <View style={styles.invoiceSection}>
+                <View style={styles.invoiceShopRow}>
+                  {placedOrder?.vendor_image && (
+                    <Image source={{ uri: placedOrder.vendor_image }} style={styles.invoiceShopImage} />
+                  )}
+                  <View>
+                    <Text style={styles.invoiceShopName}>{placedOrder?.vendor_name}</Text>
+                    <Text style={styles.invoiceShopAddress}>{placedOrder?.vendor_address}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Items */}
+              <View style={styles.invoiceSection}>
+                <Text style={styles.invoiceSectionTitle}>Items</Text>
+                {placedOrder?.items?.map((item: any, idx: number) => (
+                  <View key={idx} style={styles.invoiceItem}>
+                    <View style={styles.invoiceItemLeft}>
+                      <Text style={styles.invoiceItemQty}>{item.quantity}x</Text>
+                      <Text style={styles.invoiceItemName}>{item.name}</Text>
+                    </View>
+                    <Text style={styles.invoiceItemPrice}>₹{item.total}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Totals */}
+              <View style={styles.invoiceSection}>
+                <View style={styles.invoiceTotalRow}>
+                  <Text style={styles.invoiceTotalLabel}>Subtotal</Text>
+                  <Text style={styles.invoiceTotalValue}>₹{placedOrder?.subtotal}</Text>
+                </View>
+                <View style={styles.invoiceTotalRow}>
+                  <Text style={styles.invoiceTotalLabel}>GST ({(placedOrder?.tax_rate || 0) * 100}%)</Text>
+                  <Text style={styles.invoiceTotalValue}>₹{placedOrder?.tax_amount}</Text>
+                </View>
+                <View style={styles.invoiceTotalRow}>
+                  <Text style={styles.invoiceTotalLabel}>Delivery</Text>
+                  <Text style={styles.invoiceTotalValue}>
+                    {placedOrder?.delivery_fee > 0 ? `₹${placedOrder?.delivery_fee}` : 'Free'}
+                  </Text>
+                </View>
+                <View style={[styles.invoiceTotalRow, styles.invoiceGrandTotal]}>
+                  <Text style={styles.invoiceGrandTotalLabel}>Grand Total</Text>
+                  <Text style={styles.invoiceGrandTotalValue}>₹{placedOrder?.grand_total}</Text>
+                </View>
+              </View>
+
+              {/* Delivery Info */}
+              <View style={styles.invoiceSection}>
+                <Text style={styles.invoiceSectionTitle}>Delivery To</Text>
+                <Text style={styles.invoiceDeliveryAddress}>{placedOrder?.delivery_address?.address}</Text>
+                <View style={styles.invoiceDeliveryType}>
+                  <Ionicons 
+                    name={placedOrder?.delivery_type === 'agent_delivery' ? 'people' : 'bicycle'} 
+                    size={16} 
+                    color="#6B7280" 
+                  />
+                  <Text style={styles.invoiceDeliveryTypeText}>
+                    {placedOrder?.delivery_type === 'agent_delivery' ? 'QuickWish Agent Delivery' : 'Shop Delivery'}
+                  </Text>
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={styles.invoiceFooter}>
+              <TouchableOpacity 
+                style={styles.trackOrderButton}
+                onPress={() => {
+                  setShowInvoiceModal(false);
+                  router.push(`/orders/${placedOrder?.order_id}`);
+                }}
+              >
+                <Ionicons name="location" size={20} color="#fff" />
+                <Text style={styles.trackOrderText}>Track Order</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.doneButton}
+                onPress={() => {
+                  setShowInvoiceModal(false);
+                  router.back();
+                }}
+              >
+                <Text style={styles.doneButtonText}>Done</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -696,6 +998,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, fontSize: 14, color: '#6B7280' },
+  
+  // Toast
+  toast: { position: 'absolute', bottom: 100, left: 20, right: 20, backgroundColor: '#10B981', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 1000, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 },
+  toastText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  
+  // Confetti
+  confettiContainer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100, pointerEvents: 'none' },
+  confettiPiece: { position: 'absolute', width: 10, height: 10, borderRadius: 2 },
+  
+  // Header
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
   backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
@@ -703,128 +1015,189 @@ const styles = StyleSheet.create({
   cartButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', position: 'relative' },
   cartBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: '#EF4444', width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
   cartBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
+  
   content: { flex: 1 },
-  vendorBanner: { height: 180, position: 'relative' },
+  vendorBanner: { height: 160, position: 'relative' },
   bannerImage: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
-  bannerOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingVertical: 16 },
+  bannerOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingVertical: 12 },
   bannerContent: {},
-  vendorName: { fontSize: 24, fontWeight: '800', color: '#fff', marginBottom: 6 },
+  vendorName: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 4 },
   vendorMeta: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   ratingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  ratingText: { fontSize: 14, fontWeight: '700', color: '#F59E0B', marginLeft: 4 },
-  ratingCount: { fontSize: 12, color: '#6B7280', marginLeft: 2 },
-  vendorCategory: { fontSize: 14, color: 'rgba(255,255,255,0.9)', fontWeight: '500' },
-  vendorInfoCard: { backgroundColor: '#fff', marginHorizontal: 16, marginTop: -20, borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 10 },
-  infoText: { fontSize: 14, color: '#4B5563', flex: 1 },
+  ratingText: { fontSize: 13, fontWeight: '700', color: '#F59E0B', marginLeft: 4 },
+  ratingCount: { fontSize: 11, color: '#6B7280', marginLeft: 2 },
+  vendorCategory: { fontSize: 13, color: 'rgba(255,255,255,0.9)', fontWeight: '500' },
+  
+  vendorInfoCard: { backgroundColor: '#fff', marginHorizontal: 16, marginTop: -16, borderRadius: 12, padding: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 10 },
+  infoText: { fontSize: 13, color: '#4B5563', flex: 1 },
   deliveryOptions: { flexDirection: 'row', marginTop: 8, gap: 8 },
   deliveryTag: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, gap: 6 },
-  deliveryTagText: { fontSize: 12, fontWeight: '600' },
+  deliveryTagText: { fontSize: 11, fontWeight: '600' },
+  
   categoryFilter: { paddingHorizontal: 16, paddingVertical: 12 },
-  categoryChip: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#E5E7EB', borderRadius: 20, marginRight: 8 },
+  categoryChip: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#E5E7EB', borderRadius: 20, marginRight: 8 },
   categoryChipSelected: { backgroundColor: '#10B981' },
-  categoryChipText: { fontSize: 13, fontWeight: '600', color: '#6B7280' },
+  categoryChipText: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
   categoryChipTextSelected: { color: '#fff' },
+  
   productsSection: { paddingHorizontal: 16 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1F2937', marginBottom: 12 },
-  productsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  productCard: { width: (SCREEN_WIDTH - 44) / 2, backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  productImageContainer: { height: 120, position: 'relative' },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937', marginBottom: 12 },
+  productsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  productCard: { width: (SCREEN_WIDTH - 42) / 2, backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  productImageContainer: { height: 110, position: 'relative' },
   productImage: { width: '100%', height: '100%' },
   productImagePlaceholder: { width: '100%', height: '100%', backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
-  discountBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  discountText: { fontSize: 10, fontWeight: '700', color: '#fff' },
-  multiImageBadge: { position: 'absolute', bottom: 8, right: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, gap: 3 },
-  multiImageText: { fontSize: 10, color: '#fff', fontWeight: '600' },
+  discountBadge: { position: 'absolute', top: 6, left: 6, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  discountText: { fontSize: 9, fontWeight: '700', color: '#fff' },
+  multiImageBadge: { position: 'absolute', bottom: 6, right: 6, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, gap: 3 },
+  multiImageText: { fontSize: 9, color: '#fff', fontWeight: '600' },
+  
   productInfo: { padding: 10 },
-  productName: { fontSize: 13, fontWeight: '600', color: '#1F2937', height: 36, lineHeight: 18 },
+  productName: { fontSize: 12, fontWeight: '600', color: '#1F2937', height: 32, lineHeight: 16 },
   productRating: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  productRatingText: { fontSize: 11, color: '#F59E0B', fontWeight: '600', marginLeft: 3 },
-  productLikes: { fontSize: 11, color: '#9CA3AF', marginLeft: 4 },
-  productPricing: { flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 6 },
-  productPrice: { fontSize: 16, fontWeight: '700', color: '#10B981' },
-  productOriginalPrice: { fontSize: 12, color: '#9CA3AF', textDecorationLine: 'line-through' },
+  productRatingText: { fontSize: 10, color: '#F59E0B', fontWeight: '600', marginLeft: 3 },
+  productLikes: { fontSize: 10, color: '#9CA3AF', marginLeft: 4 },
+  productPricing: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 },
+  productPrice: { fontSize: 15, fontWeight: '700', color: '#10B981' },
+  productOriginalPrice: { fontSize: 11, color: '#9CA3AF', textDecorationLine: 'line-through' },
+  
   addToCartButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#10B981', paddingVertical: 8, borderRadius: 8, marginTop: 8, gap: 4 },
-  addToCartText: { fontSize: 13, fontWeight: '600', color: '#fff' },
+  addToCartText: { fontSize: 12, fontWeight: '600', color: '#fff' },
+  
+  quantityControlsInline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#D1FAE5', borderRadius: 8, marginTop: 8, paddingVertical: 4 },
+  qtyBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
+  qtyText: { fontSize: 14, fontWeight: '700', color: '#10B981', minWidth: 30, textAlign: 'center' },
+  
   bottomPadding: { height: 100 },
-  floatingCart: { position: 'absolute', bottom: 90, left: 16, right: 16, backgroundColor: '#10B981', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  
+  floatingCart: { position: 'absolute', bottom: 20, left: 16, right: 16, backgroundColor: '#10B981', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   floatingCartLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   floatingCartBadge: { backgroundColor: '#fff', width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   floatingCartBadgeText: { fontSize: 12, fontWeight: '700', color: '#10B981' },
   floatingCartText: { fontSize: 15, fontWeight: '600', color: '#fff' },
   floatingCartTotal: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  
+  // Modals
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  productModal: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
+  productModal: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '85%' },
   modalClose: { position: 'absolute', top: 16, right: 16, zIndex: 10, backgroundColor: '#fff', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
-  imageCarousel: { height: 250 },
-  carouselImage: { width: SCREEN_WIDTH, height: 250 },
-  imageIndicators: { flexDirection: 'row', justifyContent: 'center', paddingVertical: 12, gap: 6 },
+  imageCarousel: { height: 220 },
+  carouselImage: { width: SCREEN_WIDTH, height: 220 },
+  imageIndicators: { flexDirection: 'row', justifyContent: 'center', paddingVertical: 10, gap: 6 },
   indicator: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#D1D5DB' },
   indicatorActive: { backgroundColor: '#10B981', width: 20 },
-  productDetails: { padding: 20, maxHeight: 250 },
-  modalProductName: { fontSize: 22, fontWeight: '700', color: '#1F2937', marginBottom: 10 },
-  modalProductMeta: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 12 },
+  productDetails: { padding: 16, maxHeight: 200 },
+  modalProductName: { fontSize: 20, fontWeight: '700', color: '#1F2937', marginBottom: 8 },
+  modalProductMeta: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 10 },
   modalRating: { flexDirection: 'row', alignItems: 'center' },
   modalRatingText: { fontSize: 14, fontWeight: '600', color: '#F59E0B', marginLeft: 4 },
   modalRatingCount: { fontSize: 12, color: '#9CA3AF', marginLeft: 4 },
   modalLikes: { flexDirection: 'row', alignItems: 'center' },
   modalLikesText: { fontSize: 14, color: '#6B7280', marginLeft: 4 },
-  modalDescription: { fontSize: 14, color: '#6B7280', lineHeight: 22, marginBottom: 16 },
-  modalPricing: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  modalPrice: { fontSize: 28, fontWeight: '800', color: '#10B981' },
-  modalOriginalPrice: { fontSize: 18, color: '#9CA3AF', textDecorationLine: 'line-through' },
+  modalDescription: { fontSize: 13, color: '#6B7280', lineHeight: 20, marginBottom: 12 },
+  modalPricing: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  modalPrice: { fontSize: 26, fontWeight: '800', color: '#10B981' },
+  modalOriginalPrice: { fontSize: 16, color: '#9CA3AF', textDecorationLine: 'line-through' },
   modalSaveBadge: { backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  modalSaveText: { fontSize: 12, fontWeight: '600', color: '#10B981' },
+  modalSaveText: { fontSize: 11, fontWeight: '600', color: '#10B981' },
   stockInfo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  stockText: { fontSize: 13, color: '#6B7280' },
-  modalActions: { padding: 20, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
-  modalAddButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#10B981', paddingVertical: 16, borderRadius: 12, gap: 8 },
+  stockText: { fontSize: 12, color: '#6B7280' },
+  modalActions: { padding: 16, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
+  modalAddButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#10B981', paddingVertical: 14, borderRadius: 12, gap: 8 },
   modalAddText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  cartModal: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '80%' },
-  cartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
-  cartTitle: { fontSize: 20, fontWeight: '700', color: '#1F2937' },
-  emptyCart: { alignItems: 'center', paddingVertical: 60 },
-  emptyCartText: { fontSize: 16, color: '#9CA3AF', marginTop: 12 },
-  cartItems: { maxHeight: 300 },
-  cartItem: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  cartItemImage: { width: 60, height: 60, borderRadius: 8 },
+  modalQuantityControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#D1FAE5', borderRadius: 12, paddingVertical: 10 },
+  modalQtyBtn: { width: 50, height: 40, justifyContent: 'center', alignItems: 'center' },
+  modalQtyText: { fontSize: 16, fontWeight: '700', color: '#10B981', minWidth: 100, textAlign: 'center' },
+  
+  // Cart Modal
+  cartModal: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '75%' },
+  cartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  cartTitle: { fontSize: 18, fontWeight: '700', color: '#1F2937' },
+  emptyCart: { alignItems: 'center', paddingVertical: 50 },
+  emptyCartText: { fontSize: 15, color: '#9CA3AF', marginTop: 12 },
+  cartItems: { maxHeight: 280 },
+  cartItem: { flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  cartItemImage: { width: 56, height: 56, borderRadius: 8 },
   cartItemInfo: { flex: 1, marginLeft: 12 },
-  cartItemName: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
-  cartItemPrice: { fontSize: 13, color: '#6B7280', marginTop: 4 },
-  quantityControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  quantityButton: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
-  quantityText: { fontSize: 15, fontWeight: '600', color: '#1F2937', minWidth: 24, textAlign: 'center' },
-  cartFooter: { padding: 20, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
-  cartTotalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  cartTotalLabel: { fontSize: 16, color: '#6B7280' },
-  cartTotalValue: { fontSize: 20, fontWeight: '700', color: '#1F2937' },
-  checkoutButton: { backgroundColor: '#10B981', paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
-  checkoutButtonText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  clearCartButton: { alignItems: 'center', paddingVertical: 12, marginTop: 8 },
-  clearCartText: { fontSize: 14, color: '#EF4444' },
+  cartItemName: { fontSize: 13, fontWeight: '600', color: '#1F2937' },
+  cartItemPrice: { fontSize: 12, color: '#6B7280', marginTop: 4 },
+  quantityControls: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  quantityButton: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  quantityText: { fontSize: 14, fontWeight: '600', color: '#1F2937', minWidth: 24, textAlign: 'center' },
+  cartFooter: { padding: 16, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
+  cartTotalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  cartTotalLabel: { fontSize: 15, color: '#6B7280' },
+  cartTotalValue: { fontSize: 18, fontWeight: '700', color: '#1F2937' },
+  checkoutButton: { backgroundColor: '#10B981', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  checkoutButtonText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  clearCartButton: { alignItems: 'center', paddingVertical: 10, marginTop: 6 },
+  clearCartText: { fontSize: 13, color: '#EF4444' },
+  
+  // Checkout Modal
   checkoutModal: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
-  checkoutContent: { padding: 20 },
-  checkoutSection: { marginBottom: 24 },
-  checkoutSectionTitle: { fontSize: 16, fontWeight: '700', color: '#1F2937', marginBottom: 12 },
-  addressInput: { backgroundColor: '#F3F4F6', borderRadius: 12, padding: 14, fontSize: 15, color: '#1F2937', minHeight: 80, textAlignVertical: 'top' },
-  deliveryOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 14, borderRadius: 12, marginBottom: 10, borderWidth: 2, borderColor: 'transparent' },
+  checkoutContent: { padding: 16 },
+  checkoutSection: { marginBottom: 20 },
+  checkoutSectionTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937', marginBottom: 10 },
+  addressOption: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 12, borderRadius: 10, marginBottom: 8, borderWidth: 2, borderColor: 'transparent', gap: 12 },
+  addressOptionSelected: { borderColor: '#10B981', backgroundColor: '#F0FDF4' },
+  addressOptionContent: { flex: 1 },
+  addressLabel: { fontSize: 13, fontWeight: '600', color: '#1F2937' },
+  addressText: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  addressInput: { backgroundColor: '#F3F4F6', borderRadius: 10, padding: 12, fontSize: 14, color: '#1F2937', minHeight: 70, textAlignVertical: 'top' },
+  deliveryOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB', padding: 12, borderRadius: 10, marginBottom: 8, borderWidth: 2, borderColor: 'transparent' },
   deliveryOptionSelected: { borderColor: '#10B981', backgroundColor: '#F0FDF4' },
   deliveryOptionLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   radioOuter: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D1D5DB', justifyContent: 'center', alignItems: 'center' },
   radioOuterSelected: { borderColor: '#10B981' },
   radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#10B981' },
-  deliveryOptionTitle: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
-  deliveryOptionDesc: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  deliveryOptionPrice: { fontSize: 14, fontWeight: '700', color: '#10B981' },
-  agentDeliveryInfo: { flexDirection: 'row', backgroundColor: '#EFF6FF', padding: 12, borderRadius: 10, gap: 10, marginTop: 8 },
-  agentDeliveryText: { flex: 1, fontSize: 12, color: '#1E40AF', lineHeight: 18 },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
-  summaryLabel: { fontSize: 14, color: '#6B7280' },
-  summaryValue: { fontSize: 14, fontWeight: '600', color: '#1F2937' },
-  summaryTotal: { borderTopWidth: 1, borderTopColor: '#E5E7EB', marginTop: 8, paddingTop: 12 },
-  summaryTotalLabel: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
-  summaryTotalValue: { fontSize: 20, fontWeight: '700', color: '#10B981' },
-  checkoutFooter: { padding: 20, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
-  placeOrderButton: { backgroundColor: '#10B981', paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
-  placeOrderText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  deliveryOptionTitle: { fontSize: 13, fontWeight: '600', color: '#1F2937' },
+  deliveryOptionDesc: { fontSize: 11, color: '#6B7280', marginTop: 2 },
+  deliveryOptionPrice: { fontSize: 13, fontWeight: '700', color: '#10B981' },
+  agentDeliveryInfo: { flexDirection: 'row', backgroundColor: '#EFF6FF', padding: 10, borderRadius: 8, gap: 8, marginTop: 6 },
+  agentDeliveryText: { flex: 1, fontSize: 11, color: '#1E40AF', lineHeight: 16 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
+  summaryLabel: { fontSize: 13, color: '#6B7280' },
+  summaryValue: { fontSize: 13, fontWeight: '600', color: '#1F2937' },
+  summaryTotal: { borderTopWidth: 1, borderTopColor: '#E5E7EB', marginTop: 6, paddingTop: 10 },
+  summaryTotalLabel: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
+  summaryTotalValue: { fontSize: 18, fontWeight: '700', color: '#10B981' },
+  checkoutFooter: { padding: 16, borderTopWidth: 1, borderTopColor: '#E5E7EB' },
+  placeOrderButton: { backgroundColor: '#10B981', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  placeOrderButtonDisabled: { opacity: 0.7 },
+  placeOrderText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  
+  // Invoice Modal
+  invoiceOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  invoiceModal: { backgroundColor: '#fff', borderRadius: 20, width: '100%', maxHeight: '85%', overflow: 'hidden' },
+  invoiceHeader: { alignItems: 'center', paddingVertical: 24, backgroundColor: '#F0FDF4' },
+  successIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#10B981', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  invoiceTitle: { fontSize: 22, fontWeight: '800', color: '#1F2937' },
+  invoiceOrderId: { fontSize: 14, color: '#6B7280', marginTop: 4 },
+  invoiceContent: { padding: 16 },
+  invoiceSection: { marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  invoiceSectionTitle: { fontSize: 13, fontWeight: '700', color: '#9CA3AF', marginBottom: 10, textTransform: 'uppercase' },
+  invoiceShopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  invoiceShopImage: { width: 48, height: 48, borderRadius: 8 },
+  invoiceShopName: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
+  invoiceShopAddress: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  invoiceItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
+  invoiceItemLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 },
+  invoiceItemQty: { fontSize: 13, fontWeight: '600', color: '#10B981', minWidth: 30 },
+  invoiceItemName: { fontSize: 13, color: '#1F2937', flex: 1 },
+  invoiceItemPrice: { fontSize: 13, fontWeight: '600', color: '#1F2937' },
+  invoiceTotalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  invoiceTotalLabel: { fontSize: 13, color: '#6B7280' },
+  invoiceTotalValue: { fontSize: 13, color: '#1F2937' },
+  invoiceGrandTotal: { borderTopWidth: 1, borderTopColor: '#E5E7EB', marginTop: 8, paddingTop: 10 },
+  invoiceGrandTotalLabel: { fontSize: 16, fontWeight: '700', color: '#1F2937' },
+  invoiceGrandTotalValue: { fontSize: 20, fontWeight: '800', color: '#10B981' },
+  invoiceDeliveryAddress: { fontSize: 13, color: '#1F2937', lineHeight: 18 },
+  invoiceDeliveryType: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  invoiceDeliveryTypeText: { fontSize: 12, color: '#6B7280' },
+  invoiceFooter: { padding: 16, gap: 10 },
+  trackOrderButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#10B981', paddingVertical: 14, borderRadius: 12, gap: 8 },
+  trackOrderText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  doneButton: { alignItems: 'center', paddingVertical: 12 },
+  doneButtonText: { fontSize: 14, color: '#6B7280' },
 });
