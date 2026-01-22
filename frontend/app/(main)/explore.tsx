@@ -255,6 +255,44 @@ export default function ExploreScreen() {
     };
   }, [currentStoryIndex]);
 
+  // Auto-scroll highlights effect
+  useEffect(() => {
+    const startAutoScroll = () => {
+      autoScrollTimerRef.current = setInterval(() => {
+        if (isUserScrollingRef.current) return;
+        
+        setCurrentHighlightIndex((prevIndex) => {
+          const nextIndex = (prevIndex + 1) % sortedStories.length;
+          highlightsScrollRef.current?.scrollTo({
+            x: nextIndex * HIGHLIGHT_CARD_WIDTH,
+            animated: true,
+          });
+          return nextIndex;
+        });
+      }, AUTO_SCROLL_INTERVAL);
+    };
+
+    startAutoScroll();
+
+    return () => {
+      if (autoScrollTimerRef.current) {
+        clearInterval(autoScrollTimerRef.current);
+      }
+    };
+  }, [sortedStories.length, HIGHLIGHT_CARD_WIDTH]);
+
+  // Handle user scroll on highlights
+  const handleHighlightScrollBegin = () => {
+    isUserScrollingRef.current = true;
+  };
+
+  const handleHighlightScrollEnd = (event: any) => {
+    isUserScrollingRef.current = false;
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const newIndex = Math.round(offsetX / HIGHLIGHT_CARD_WIDTH);
+    setCurrentHighlightIndex(Math.max(0, Math.min(newIndex, sortedStories.length - 1)));
+  };
+
   // Handle story tap - left side = prev, right side = next
   const handleStoryTap = (event: any) => {
     const touchX = event.nativeEvent.locationX;
