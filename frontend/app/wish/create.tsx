@@ -480,7 +480,7 @@ export default function CreateWishScreen() {
 
   const renderStep1 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Primary Wish Category</Text>
+      <Text style={styles.stepTitle}>Choose Your Wish</Text>
       <Text style={styles.stepSubtitle}>Select what type of help you need</Text>
       
       {/* Show sub-categories if a type with sub-categories is selected */}
