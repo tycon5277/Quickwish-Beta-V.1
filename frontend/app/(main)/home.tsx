@@ -529,18 +529,18 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#212529',
     marginTop: 24,
     marginBottom: 12,
   },
   sectionTitleInline: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#212529',
   },
   seeAllText: {
     fontSize: 14,
-    color: '#6366F1',
+    color: '#7C3AED',
     fontWeight: '500',
   },
   quickActions: {
@@ -555,14 +555,14 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 16,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#E8D9F4',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
   quickActionLabel: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#6C757D',
     textAlign: 'center',
   },
   loader: {
