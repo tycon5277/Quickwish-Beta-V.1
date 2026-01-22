@@ -1,10 +1,10 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Image, Dimensions, Modal, TextInput } from 'react-native';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Image, Dimensions, Modal, TextInput, TouchableWithoutFeedback, Animated, PanResponder } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Creator Types
 type CreatorType = 'agent' | 'vendor' | 'promoter';
@@ -16,7 +16,7 @@ interface Story {
   creator_type: CreatorType;
   category: string;
   is_live?: boolean;
-  has_unseen?: boolean;
+  viewed?: boolean;
   image: string;
   text?: string;
 }
@@ -40,15 +40,15 @@ interface FeedPost {
   completedJobs?: number;
 }
 
-// Sample Stories Data
-const STORIES: Story[] = [
-  { id: '1', user_name: 'Ramesh', user_image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', creator_type: 'agent', category: 'Bike Delivery', has_unseen: true, image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400', text: '🏆 1000th Delivery!' },
-  { id: '2', user_name: 'GreenMart', user_image: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=100', creator_type: 'vendor', category: 'Grocery', has_unseen: true, image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400', text: '🎉 50% Off Today!' },
-  { id: '3', user_name: 'TravelWithMe', user_image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', creator_type: 'promoter', category: 'Travel', has_unseen: true, image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400', text: '🚌 Weekend Trip Open!' },
-  { id: '4', user_name: 'CleanPro', user_image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', creator_type: 'agent', category: 'Home Cleaner', has_unseen: false, image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400', text: 'Deep Clean Special' },
-  { id: '5', user_name: 'BiryaniKing', user_image: 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=100', creator_type: 'vendor', category: 'Restaurant', has_unseen: true, image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400', text: '🍗 New Menu!' },
-  { id: '6', user_name: 'GardenGuru', user_image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', creator_type: 'agent', category: 'Gardener', has_unseen: false, image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400', text: 'Garden Tips' },
-  { id: '7', user_name: 'FitLife', user_image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=100', creator_type: 'promoter', category: 'Fitness', is_live: true, has_unseen: true, image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400', text: '🔴 LIVE Workout' },
+// Initial Stories Data
+const INITIAL_STORIES: Story[] = [
+  { id: '1', user_name: 'Ramesh', user_image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100', creator_type: 'agent', category: 'Bike Delivery', viewed: false, image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400', text: '🏆 1000th Delivery!' },
+  { id: '2', user_name: 'GreenMart', user_image: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=100', creator_type: 'vendor', category: 'Grocery', viewed: false, image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400', text: '🎉 50% Off Today!' },
+  { id: '3', user_name: 'TravelWithMe', user_image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100', creator_type: 'promoter', category: 'Travel', viewed: false, image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400', text: '🚌 Weekend Trip Open!' },
+  { id: '4', user_name: 'CleanPro', user_image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100', creator_type: 'agent', category: 'Home Cleaner', viewed: false, image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400', text: 'Deep Clean Special' },
+  { id: '5', user_name: 'BiryaniKing', user_image: 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=100', creator_type: 'vendor', category: 'Restaurant', viewed: false, image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400', text: '🍗 New Menu!' },
+  { id: '6', user_name: 'GardenGuru', user_image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100', creator_type: 'agent', category: 'Gardener', viewed: false, image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400', text: 'Garden Tips' },
+  { id: '7', user_name: 'FitLife', user_image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=100', creator_type: 'promoter', category: 'Fitness', is_live: true, viewed: false, image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400', text: '🔴 LIVE Workout' },
 ];
 
 // Sample Feed Posts
@@ -149,18 +149,118 @@ const SEARCH_CATEGORIES = [
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const [posts] = useState<FeedPost[]>(FEED_POSTS);
-  const [stories] = useState<Story[]>(STORIES);
+  const [stories, setStories] = useState<Story[]>(INITIAL_STORIES);
   const [refreshing, setRefreshing] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
-  const [selectedStory, setSelectedStory] = useState<Story | null>(null);
+  const [currentStoryIndex, setCurrentStoryIndex] = useState<number>(-1);
   const [currentImageIndex, setCurrentImageIndex] = useState<Record<string, number>>({});
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchCategory, setSearchCategory] = useState('all');
+  
+  // Story progress animation
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const storyTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get sorted stories (unviewed first, then viewed)
+  const sortedStories = [...stories].sort((a, b) => {
+    if (a.viewed === b.viewed) return 0;
+    return a.viewed ? 1 : -1;
+  });
+
+  const currentStory = currentStoryIndex >= 0 ? sortedStories[currentStoryIndex] : null;
+
+  // Start story timer
+  const startStoryTimer = useCallback(() => {
+    progressAnim.setValue(0);
+    
+    if (storyTimerRef.current) {
+      clearTimeout(storyTimerRef.current);
+    }
+
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: 5000,
+      useNativeDriver: false,
+    }).start();
+
+    storyTimerRef.current = setTimeout(() => {
+      goToNextStory();
+    }, 5000);
+  }, [currentStoryIndex]);
+
+  // Go to next story
+  const goToNextStory = useCallback(() => {
+    if (currentStoryIndex < sortedStories.length - 1) {
+      // Mark current as viewed
+      if (currentStory) {
+        setStories(prev => prev.map(s => 
+          s.id === currentStory.id ? { ...s, viewed: true } : s
+        ));
+      }
+      setCurrentStoryIndex(currentStoryIndex + 1);
+    } else {
+      // End of stories - mark last as viewed and close
+      if (currentStory) {
+        setStories(prev => prev.map(s => 
+          s.id === currentStory.id ? { ...s, viewed: true } : s
+        ));
+      }
+      closeStoryViewer();
+    }
+  }, [currentStoryIndex, sortedStories.length, currentStory]);
+
+  // Go to previous story
+  const goToPrevStory = useCallback(() => {
+    if (currentStoryIndex > 0) {
+      setCurrentStoryIndex(currentStoryIndex - 1);
+    }
+  }, [currentStoryIndex]);
+
+  // Close story viewer
+  const closeStoryViewer = useCallback(() => {
+    if (storyTimerRef.current) {
+      clearTimeout(storyTimerRef.current);
+    }
+    progressAnim.setValue(0);
+    setCurrentStoryIndex(-1);
+  }, []);
+
+  // Open story
+  const openStory = useCallback((storyId: string) => {
+    const index = sortedStories.findIndex(s => s.id === storyId);
+    if (index >= 0) {
+      setCurrentStoryIndex(index);
+    }
+  }, [sortedStories]);
+
+  // Start timer when story changes
+  useEffect(() => {
+    if (currentStoryIndex >= 0) {
+      startStoryTimer();
+    }
+    return () => {
+      if (storyTimerRef.current) {
+        clearTimeout(storyTimerRef.current);
+      }
+    };
+  }, [currentStoryIndex]);
+
+  // Handle story tap - left side = prev, right side = next
+  const handleStoryTap = (event: any) => {
+    const touchX = event.nativeEvent.locationX;
+    if (touchX < SCREEN_WIDTH / 3) {
+      goToPrevStory();
+    } else {
+      goToNextStory();
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
+    // Reset viewed status on refresh
+    setStories(INITIAL_STORIES);
     setRefreshing(false);
   };
 
@@ -198,6 +298,11 @@ export default function ExploreScreen() {
     return filtered;
   };
 
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
@@ -224,7 +329,7 @@ export default function ExploreScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#10B981" />
         }
       >
-        {/* Stories Section */}
+        {/* Stories Section - Distinctive Rounded Rectangle Shape */}
         <View style={styles.storiesSection}>
           <Text style={styles.sectionLabel}>HIGHLIGHTS</Text>
           <ScrollView 
@@ -232,28 +337,46 @@ export default function ExploreScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.storiesContainer}
           >
-            {stories.map((story) => {
+            {sortedStories.map((story) => {
               const config = CREATOR_CONFIG[story.creator_type];
               return (
                 <TouchableOpacity 
                   key={story.id} 
                   style={styles.storyItem}
-                  onPress={() => setSelectedStory(story)}
+                  onPress={() => openStory(story.id)}
+                  activeOpacity={0.8}
                 >
-                  <LinearGradient
-                    colors={story.has_unseen ? config.gradient as any : ['#E5E7EB', '#D1D5DB']}
-                    style={styles.storyRing}
-                  >
-                    <View style={styles.storyAvatarWrapper}>
-                      <Image source={{ uri: story.user_image }} style={styles.storyAvatar} />
-                    </View>
-                  </LinearGradient>
-                  {story.is_live && (
-                    <View style={styles.liveBadge}>
-                      <Text style={styles.liveBadgeText}>LIVE</Text>
-                    </View>
-                  )}
-                  <Text style={styles.storyName} numberOfLines={1}>{story.user_name}</Text>
+                  {/* Distinctive Rounded Rectangle Shape */}
+                  <View style={[
+                    styles.storyCardWrapper,
+                    !story.viewed && { borderColor: config.color }
+                  ]}>
+                    <LinearGradient
+                      colors={!story.viewed ? config.gradient as any : ['#E5E7EB', '#D1D5DB']}
+                      style={styles.storyGradientBorder}
+                    >
+                      <View style={styles.storyImageWrapper}>
+                        <Image source={{ uri: story.user_image }} style={styles.storyImage} />
+                        {/* Creator Type Icon */}
+                        <View style={[styles.storyTypeIcon, { backgroundColor: config.color }]}>
+                          <Ionicons name={config.icon as any} size={10} color="#fff" />
+                        </View>
+                      </View>
+                    </LinearGradient>
+                    {story.is_live && (
+                      <View style={styles.liveBadge}>
+                        <Text style={styles.liveBadgeText}>LIVE</Text>
+                      </View>
+                    )}
+                    {story.viewed && (
+                      <View style={styles.viewedOverlay}>
+                        <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.storyName, story.viewed && styles.storyNameViewed]} numberOfLines={1}>
+                    {story.user_name}
+                  </Text>
                   <Text style={styles.storyCategory} numberOfLines={1}>{story.category}</Text>
                 </TouchableOpacity>
               );
@@ -409,47 +532,70 @@ export default function ExploreScreen() {
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      {/* Story Viewer Modal */}
-      <Modal visible={!!selectedStory} animationType="fade" transparent>
-        {selectedStory && (
+      {/* Story Viewer Modal - Blocks all gestures */}
+      <Modal 
+        visible={currentStoryIndex >= 0} 
+        animationType="fade" 
+        transparent={false}
+        onRequestClose={closeStoryViewer}
+      >
+        {currentStory && (
           <View style={styles.storyModal}>
+            {/* Story Image */}
             <Image 
-              source={{ uri: selectedStory.image }} 
+              source={{ uri: currentStory.image }} 
               style={styles.storyFullImage}
               resizeMode="cover"
             />
-            <LinearGradient
-              colors={['rgba(0,0,0,0.6)', 'transparent', 'transparent', 'rgba(0,0,0,0.6)']}
-              style={styles.storyOverlay}
-            >
-              {/* Story Header */}
-              <View style={[styles.storyHeader, { paddingTop: insets.top + 10 }]}>
-                <View style={styles.storyProgress}>
-                  <View style={styles.storyProgressFill} />
-                </View>
-                <View style={styles.storyHeaderContent}>
-                  <View style={styles.storyUserInfo}>
-                    <Image source={{ uri: selectedStory.user_image }} style={styles.storyUserAvatar} />
-                    <View>
-                      <Text style={styles.storyUsername}>{selectedStory.user_name}</Text>
-                      <Text style={styles.storyUserCategory}>{selectedStory.category}</Text>
-                    </View>
+            
+            {/* Tap Areas for Navigation */}
+            <TouchableWithoutFeedback onPress={handleStoryTap}>
+              <View style={styles.storyTapArea} />
+            </TouchableWithoutFeedback>
+
+            {/* Overlay Content */}
+            <View style={[styles.storyOverlay, { paddingTop: insets.top }]}>
+              {/* Progress Bars */}
+              <View style={styles.progressContainer}>
+                {sortedStories.map((_, idx) => (
+                  <View key={idx} style={styles.progressBarBg}>
+                    {idx < currentStoryIndex ? (
+                      <View style={[styles.progressBarFill, { width: '100%' }]} />
+                    ) : idx === currentStoryIndex ? (
+                      <Animated.View style={[styles.progressBarFill, { width: progressWidth }]} />
+                    ) : null}
                   </View>
-                  <TouchableOpacity 
-                    style={styles.storyCloseButton}
-                    onPress={() => setSelectedStory(null)}
-                  >
-                    <Ionicons name="close" size={24} color="#fff" />
-                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Story Header */}
+              <View style={styles.storyHeaderContent}>
+                <View style={styles.storyUserInfo}>
+                  <Image source={{ uri: currentStory.user_image }} style={styles.storyUserAvatar} />
+                  <View>
+                    <Text style={styles.storyUsername}>{currentStory.user_name}</Text>
+                    <Text style={styles.storyUserCategory}>{currentStory.category}</Text>
+                  </View>
                 </View>
+                <TouchableOpacity 
+                  style={styles.storyCloseButton}
+                  onPress={closeStoryViewer}
+                >
+                  <Ionicons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
               </View>
 
               {/* Story Text */}
-              {selectedStory.text && (
+              {currentStory.text && (
                 <View style={styles.storyTextContainer}>
-                  <Text style={styles.storyText}>{selectedStory.text}</Text>
+                  <Text style={styles.storyText}>{currentStory.text}</Text>
                 </View>
               )}
+
+              {/* Navigation Hints */}
+              <View style={styles.navHints}>
+                <Text style={styles.navHintText}>Tap left for previous • Tap right for next</Text>
+              </View>
 
               {/* Story Footer */}
               <View style={[styles.storyFooter, { paddingBottom: insets.bottom + 20 }]}>
@@ -460,7 +606,7 @@ export default function ExploreScreen() {
                   <Ionicons name="paper-plane-outline" size={24} color="#fff" />
                 </TouchableOpacity>
               </View>
-            </LinearGradient>
+            </View>
           </View>
         )}
       </Modal>
@@ -601,7 +747,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   
-  // Stories Section
+  // Stories Section - Distinctive Rounded Rectangle Design
   storiesSection: {
     backgroundColor: '#fff',
     paddingTop: 16,
@@ -614,29 +760,43 @@ const styles = StyleSheet.create({
   storyItem: {
     alignItems: 'center',
     marginHorizontal: 6,
-    width: 72,
+    width: 76,
   },
-  storyRing: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    padding: 3,
+  storyCardWrapper: {
+    position: 'relative',
   },
-  storyAvatarWrapper: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 30,
+  storyGradientBorder: {
+    padding: 2.5,
+    borderRadius: 16,
+  },
+  storyImageWrapper: {
     backgroundColor: '#fff',
+    borderRadius: 14,
     padding: 2,
+    position: 'relative',
   },
-  storyAvatar: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 28,
+  storyImage: {
+    width: 64,
+    height: 80,
+    borderRadius: 12,
+  },
+  storyTypeIcon: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   liveBadge: {
     position: 'absolute',
-    top: 48,
+    top: -4,
+    left: '50%',
+    marginLeft: -18,
     backgroundColor: '#EF4444',
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -649,12 +809,26 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#fff',
   },
+  viewedOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   storyName: {
     fontSize: 11,
     fontWeight: '600',
     color: '#1F2937',
     marginTop: 6,
     textAlign: 'center',
+  },
+  storyNameViewed: {
+    color: '#9CA3AF',
   },
   storyCategory: {
     fontSize: 9,
@@ -864,37 +1038,49 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
   
-  // Story Modal
+  // Story Modal - Full Screen
   storyModal: {
     flex: 1,
     backgroundColor: '#000',
   },
   storyFullImage: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
+  storyTapArea: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
   storyOverlay: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 2,
     justifyContent: 'space-between',
-  },
-  storyHeader: {
     paddingHorizontal: 16,
+    pointerEvents: 'box-none',
   },
-  storyProgress: {
+  progressContainer: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 8,
+  },
+  progressBarBg: {
+    flex: 1,
     height: 3,
     backgroundColor: 'rgba(255,255,255,0.3)',
     borderRadius: 2,
-    marginBottom: 12,
+    overflow: 'hidden',
   },
-  storyProgressFill: {
-    width: '50%',
+  progressBarFill: {
     height: '100%',
     backgroundColor: '#fff',
-    borderRadius: 2,
   },
   storyHeaderContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 12,
+    pointerEvents: 'auto',
   },
   storyUserInfo: {
     flexDirection: 'row',
@@ -904,7 +1090,7 @@ const styles = StyleSheet.create({
   storyUserAvatar: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#fff',
   },
@@ -926,12 +1112,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   storyTextContainer: {
-    position: 'absolute',
-    bottom: '25%',
-    left: 0,
-    right: 0,
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
+    pointerEvents: 'none',
   },
   storyText: {
     fontSize: 32,
@@ -942,10 +1127,19 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },
+  navHints: {
+    alignItems: 'center',
+    pointerEvents: 'none',
+  },
+  navHintText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+  },
   storyFooter: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 16,
+    pointerEvents: 'auto',
   },
   storyActionBtn: {
     width: 50,
@@ -1024,7 +1218,7 @@ const styles = StyleSheet.create({
   searchResultAvatar: {
     width: 50,
     height: 50,
-    borderRadius: 25,
+    borderRadius: 12,
   },
   searchResultInfo: {
     flex: 1,
