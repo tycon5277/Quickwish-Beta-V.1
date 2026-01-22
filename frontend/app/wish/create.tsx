@@ -473,9 +473,49 @@ export default function CreateWishScreen() {
     setTimeout(() => setStep(2), 300);
   };
 
-  // Get placeholder text based on wish type
+  // Get dynamic placeholder text based on wish type and sub-category
   const getTitlePlaceholder = () => {
-    return selectedType?.example || 'Describe what you need';
+    if (!wishType) return 'Describe what you need';
+    
+    // Dynamic examples based on category and sub-category
+    const placeholders: Record<string, Record<string, string> | string> = {
+      delivery: 'e.g., "Need groceries from local market"',
+      ride_request: {
+        bike: 'e.g., "Need bike ride to office"',
+        car: 'e.g., "Need car ride to airport"',
+        default: 'e.g., "Need a ride to the airport"'
+      },
+      commercial_ride: {
+        auto: 'e.g., "Need auto to railway station"',
+        taxi_car: 'e.g., "Need taxi to the mall"',
+        mini_bus: 'e.g., "Need mini bus for group travel"',
+        goods_small: 'e.g., "Need small carrier for boxes"',
+        goods_medium: 'e.g., "Need medium carrier for furniture"',
+        goods_large: 'e.g., "Need large truck for shifting"',
+        default: 'e.g., "Need transport for travel/goods"'
+      },
+      medicine_delivery: 'e.g., "Need medicines from Apollo Pharmacy"',
+      domestic_help: 'e.g., "Need help with house cleaning"',
+      construction: 'e.g., "Need help with wall painting"',
+      home_maintenance: 'e.g., "Need plumber for tap repair"',
+      errands: 'e.g., "Need someone to pay electricity bill"',
+      companionship: 'e.g., "Looking for a chess partner"',
+      others: 'e.g., "Describe what you need help with"'
+    };
+
+    const categoryPlaceholder = placeholders[wishType];
+    
+    if (typeof categoryPlaceholder === 'string') {
+      return categoryPlaceholder;
+    }
+    
+    if (typeof categoryPlaceholder === 'object') {
+      return subCategory 
+        ? (categoryPlaceholder[subCategory] || categoryPlaceholder.default)
+        : categoryPlaceholder.default;
+    }
+    
+    return 'Describe what you need';
   };
 
   const renderStep1 = () => (
