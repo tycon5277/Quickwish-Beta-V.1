@@ -1486,7 +1486,7 @@ export default function ChatDetailScreen() {
             </Text>
             
             {['Inappropriate behavior', 'Scam or fraud', 'Harassment', 'Did not show up', 'Other'].map((reason) => (
-              <TouchableOpacity key={reason} style={styles.reportReasonItem}>
+              <TouchableOpacity key={reason} style={styles.reportReasonItem} onPress={reportUser}>
                 <Text style={styles.reportReasonText}>{reason}</Text>
                 <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
               </TouchableOpacity>
@@ -1498,6 +1498,123 @@ export default function ChatDetailScreen() {
             >
               <Text style={styles.reportCloseButtonText}>Cancel</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Celebration Overlay (Phase 4) */}
+      {showCelebration && (
+        <Animated.View style={[styles.celebrationOverlay, { opacity: celebrationAnim }]}>
+          <View style={styles.celebrationContent}>
+            <Text style={styles.celebrationEmoji}>🎉</Text>
+            <Text style={styles.celebrationTitle}>Wish Completed!</Text>
+            <Text style={styles.celebrationSubtitle}>Great job! Your wish has been fulfilled.</Text>
+            <View style={styles.confettiContainer}>
+              {[...Array(20)].map((_, i) => (
+                <Animated.View
+                  key={i}
+                  style={[
+                    styles.confetti,
+                    {
+                      left: `${Math.random() * 100}%`,
+                      backgroundColor: ['#F59E0B', '#10B981', '#6366F1', '#EC4899', '#3B82F6'][i % 5],
+                      transform: [{
+                        translateY: celebrationAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-50, 400],
+                        })
+                      }, {
+                        rotate: `${Math.random() * 360}deg`
+                      }],
+                    }
+                  ]}
+                />
+              ))}
+            </View>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Rating Modal (Phase 4) */}
+      <Modal visible={showRatingModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.ratingModal}>
+            <View style={styles.ratingHeader}>
+              <Text style={styles.ratingEmoji}>⭐</Text>
+              <Text style={styles.ratingTitle}>Rate Your Experience</Text>
+              <Text style={styles.ratingSubtitle}>How was your experience with {room?.agent?.name}?</Text>
+            </View>
+            
+            {/* Star Rating */}
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity 
+                  key={star} 
+                  onPress={() => setRating(star)}
+                  style={styles.starButton}
+                >
+                  <Ionicons 
+                    name={star <= rating ? "star" : "star-outline"} 
+                    size={40} 
+                    color={star <= rating ? "#F59E0B" : "#D1D5DB"} 
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            {rating > 0 && (
+              <Text style={styles.ratingLabel}>
+                {rating === 5 ? 'Excellent! 🌟' : 
+                 rating === 4 ? 'Great! 😊' : 
+                 rating === 3 ? 'Good 👍' : 
+                 rating === 2 ? 'Fair 😐' : 'Poor 😞'}
+              </Text>
+            )}
+            
+            {/* Review Text */}
+            <TextInput
+              style={styles.reviewInput}
+              placeholder="Write a review (optional)..."
+              placeholderTextColor="#9CA3AF"
+              value={reviewText}
+              onChangeText={setReviewText}
+              multiline
+              maxLength={500}
+            />
+            
+            {/* Quick Tags */}
+            <View style={styles.quickTags}>
+              {['Professional', 'On Time', 'Friendly', 'Great Value'].map((tag) => (
+                <TouchableOpacity 
+                  key={tag} 
+                  style={styles.quickTag}
+                  onPress={() => setReviewText(prev => prev ? `${prev}, ${tag}` : tag)}
+                >
+                  <Text style={styles.quickTagText}>{tag}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            {/* Actions */}
+            <View style={styles.ratingActions}>
+              <TouchableOpacity 
+                style={styles.ratingSkipButton}
+                onPress={() => setShowRatingModal(false)}
+              >
+                <Text style={styles.ratingSkipText}>Maybe Later</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.ratingSubmitButton, rating === 0 && styles.ratingSubmitDisabled]}
+                onPress={() => {
+                  Alert.alert('Thank You!', 'Your review has been submitted.', [
+                    { text: 'OK', onPress: () => setShowRatingModal(false) }
+                  ]);
+                }}
+                disabled={rating === 0}
+              >
+                <Text style={styles.ratingSubmitText}>Submit Review</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
