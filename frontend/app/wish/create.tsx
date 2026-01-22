@@ -171,6 +171,107 @@ export default function CreateWishScreen() {
   const selectedType = WISH_TYPES.find(t => t.id === wishType);
   const hasSubCategories = selectedType?.subCategories && selectedType.subCategories.length > 0;
 
+  // Custom Box Icon Component for carriers
+  const BoxIcon = ({ type, color, size }: { type: string; color: string; size: number }) => {
+    const boxSize = size * 0.35;
+    const spacing = 2;
+    
+    if (type === 'single_box') {
+      // Single box (cube)
+      return (
+        <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{
+            width: boxSize * 1.2,
+            height: boxSize * 1.2,
+            backgroundColor: color,
+            borderRadius: 3,
+          }} />
+        </View>
+      );
+    }
+    
+    if (type === 'pyramid_boxes') {
+      // 3 boxes in pyramid (1 on top, 2 on bottom)
+      return (
+        <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ alignItems: 'center' }}>
+            <View style={{
+              width: boxSize,
+              height: boxSize,
+              backgroundColor: color,
+              borderRadius: 2,
+              marginBottom: spacing,
+            }} />
+            <View style={{ flexDirection: 'row' }}>
+              <View style={{
+                width: boxSize,
+                height: boxSize,
+                backgroundColor: color,
+                borderRadius: 2,
+                marginRight: spacing,
+              }} />
+              <View style={{
+                width: boxSize,
+                height: boxSize,
+                backgroundColor: color,
+                borderRadius: 2,
+              }} />
+            </View>
+          </View>
+        </View>
+      );
+    }
+    
+    if (type === 'five_boxes') {
+      // 5 boxes (2 on top, 3 on bottom)
+      return (
+        <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', marginBottom: spacing }}>
+              <View style={{
+                width: boxSize,
+                height: boxSize,
+                backgroundColor: color,
+                borderRadius: 2,
+                marginRight: spacing,
+              }} />
+              <View style={{
+                width: boxSize,
+                height: boxSize,
+                backgroundColor: color,
+                borderRadius: 2,
+              }} />
+            </View>
+            <View style={{ flexDirection: 'row' }}>
+              <View style={{
+                width: boxSize,
+                height: boxSize,
+                backgroundColor: color,
+                borderRadius: 2,
+                marginRight: spacing,
+              }} />
+              <View style={{
+                width: boxSize,
+                height: boxSize,
+                backgroundColor: color,
+                borderRadius: 2,
+                marginRight: spacing,
+              }} />
+              <View style={{
+                width: boxSize,
+                height: boxSize,
+                backgroundColor: color,
+                borderRadius: 2,
+              }} />
+            </View>
+          </View>
+        </View>
+      );
+    }
+    
+    return <Ionicons name="cube" size={size} color={color} />;
+  };
+
   useEffect(() => {
     if (!location) {
       getCurrentLocation();
