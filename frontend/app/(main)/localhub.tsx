@@ -406,7 +406,7 @@ export default function LocalHubScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F8F9FA',
   },
   headerWrapper: {
     overflow: 'hidden',
@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -2,
     right: -2,
-    backgroundColor: '#EF4444',
+    backgroundColor: '#F59E0B',
     width: 18,
     height: 18,
     borderRadius: 9,
