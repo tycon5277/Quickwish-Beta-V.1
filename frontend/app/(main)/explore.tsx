@@ -779,14 +779,13 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F8F9FA',
   },
   header: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomWidth: 0,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -796,7 +795,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#1F2937',
+    color: '#212529',
   },
   headerBadge: {
     marginLeft: 8,
