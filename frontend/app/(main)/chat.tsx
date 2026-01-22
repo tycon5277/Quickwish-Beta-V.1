@@ -104,6 +104,21 @@ export default function ChatScreen() {
     setRefreshing(false);
   };
 
+  const seedChatData = async () => {
+    if (!sessionToken) return;
+    try {
+      setIsLoading(true);
+      await axios.post(`${BACKEND_URL}/api/seed/chats`, {}, {
+        headers: { Authorization: `Bearer ${sessionToken}` }
+      });
+      await fetchChatRooms();
+    } catch (error) {
+      console.error('Error seeding chat data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr);
     const now = new Date();
