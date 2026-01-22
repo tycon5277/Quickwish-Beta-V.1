@@ -291,7 +291,7 @@ export default function AccountScreen() {
           <View style={styles.verificationCard}>
             <View style={styles.verificationItem}>
               <View style={[styles.verificationIcon, user?.email ? styles.verified : styles.unverified]}>
-                <Ionicons name="mail" size={18} color={user?.email ? '#10B981' : '#9CA3AF'} />
+                <Ionicons name="mail" size={18} color={user?.email ? '#7C3AED' : '#9CA3AF'} />
               </View>
               <View style={styles.verificationInfo}>
                 <Text style={styles.verificationLabel}>Email</Text>
@@ -301,7 +301,7 @@ export default function AccountScreen() {
               </View>
               {user?.email ? (
                 <View style={styles.verifiedBadge}>
-                  <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                  <Ionicons name="checkmark-circle" size={20} color="#7C3AED" />
                 </View>
               ) : (
                 <TouchableOpacity style={styles.verifyButton}>
@@ -312,7 +312,7 @@ export default function AccountScreen() {
             <View style={styles.verificationDivider} />
             <View style={styles.verificationItem}>
               <View style={[styles.verificationIcon, user?.phone ? styles.verified : styles.unverified]}>
-                <Ionicons name="call" size={18} color={user?.phone ? '#10B981' : '#9CA3AF'} />
+                <Ionicons name="call" size={18} color={user?.phone ? '#7C3AED' : '#9CA3AF'} />
               </View>
               <View style={styles.verificationInfo}>
                 <Text style={styles.verificationLabel}>Phone</Text>
@@ -322,7 +322,7 @@ export default function AccountScreen() {
               </View>
               {user?.phone ? (
                 <View style={styles.verifiedBadge}>
-                  <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                  <Ionicons name="checkmark-circle" size={20} color="#7C3AED" />
                 </View>
               ) : (
                 <TouchableOpacity 
