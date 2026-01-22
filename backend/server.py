@@ -787,20 +787,21 @@ async def clear_cart(vendor_id: Optional[str] = None, current_user: User = Depen
 # ===================== SHOP ORDER ENDPOINTS =====================
 
 class OrderCreate(BaseModel):
+    vendor_id: str
     delivery_address: dict
     delivery_type: str  # "shop_delivery" or "agent_delivery"
     notes: Optional[str] = None
 
 @api_router.post("/orders")
 async def create_order(order_data: OrderCreate, current_user: User = Depends(require_auth)):
-    """Create an order from cart"""
-    # Get cart
-    cart = await db.carts.find_one({"user_id": current_user.user_id})
+    """Create an order from cart for a specific vendor"""
+    # Get cart for specific vendor
+    cart = await db.carts.find_one({"user_id": current_user.user_id, "vendor_id": order_data.vendor_id})
     if not cart or not cart.get("items"):
-        raise HTTPException(status_code=400, detail="Cart is empty")
+        raise HTTPException(status_code=400, detail="Cart is empty for this vendor")
     
     # Get vendor
-    vendor = await db.hub_vendors.find_one({"vendor_id": cart["vendor_id"]}, {"_id": 0})
+    vendor = await db.hub_vendors.find_one({"vendor_id": order_data.vendor_id}, {"_id": 0})
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
     
@@ -817,10 +818,16 @@ async def create_order(order_data: OrderCreate, current_user: User = Depends(req
                 "product_id": product["product_id"],
                 "name": product["name"],
                 "price": price,
+                "original_price": product["price"],
                 "quantity": cart_item["quantity"],
-                "total": item_total
+                "total": item_total,
+                "image": product["images"][0] if product.get("images") else None
             })
             total_amount += item_total
+    
+    # Calculate tax (5% GST)
+    tax_rate = 0.05
+    tax_amount = round(total_amount * tax_rate, 2)
     
     # Calculate delivery fee
     delivery_fee = 0
@@ -829,21 +836,35 @@ async def create_order(order_data: OrderCreate, current_user: User = Depends(req
     elif order_data.delivery_type == "shop_delivery" and not vendor.get("has_own_delivery"):
         raise HTTPException(status_code=400, detail="This vendor doesn't offer delivery")
     
-    # Create order
+    grand_total = total_amount + tax_amount + delivery_fee
+    
+    # Create order with tracking
     order = {
         "order_id": f"order_{uuid.uuid4().hex[:12]}",
         "user_id": current_user.user_id,
-        "vendor_id": cart["vendor_id"],
+        "vendor_id": order_data.vendor_id,
         "vendor_name": vendor["name"],
+        "vendor_image": vendor.get("image"),
+        "vendor_phone": vendor.get("contact_phone"),
+        "vendor_address": vendor.get("location", {}).get("address"),
         "items": items,
-        "total_amount": total_amount,
+        "subtotal": total_amount,
+        "tax_rate": tax_rate,
+        "tax_amount": tax_amount,
         "delivery_fee": delivery_fee,
-        "grand_total": total_amount + delivery_fee,
+        "grand_total": grand_total,
         "delivery_address": order_data.delivery_address,
         "delivery_type": order_data.delivery_type,
         "assigned_agent_id": None,
-        "status": "pending",
-        "payment_status": "pending",
+        "agent_name": None,
+        "agent_phone": None,
+        "agent_location": None,  # For live tracking
+        "status": "confirmed",  # confirmed, preparing, ready, picked_up, on_the_way, nearby, delivered, cancelled
+        "status_history": [
+            {"status": "confirmed", "timestamp": datetime.now(timezone.utc).isoformat(), "message": "Order confirmed"}
+        ],
+        "estimated_delivery": (datetime.now(timezone.utc) + timedelta(minutes=45)).isoformat(),
+        "payment_status": "paid",  # Assuming payment is done
         "notes": order_data.notes,
         "created_at": datetime.now(timezone.utc)
     }
@@ -871,18 +892,18 @@ async def create_order(order_data: OrderCreate, current_user: User = Depends(req
         }
         await db.wishes.insert_one(delivery_wish)
     
-    # Clear cart
-    await db.carts.delete_one({"user_id": current_user.user_id})
+    # Clear cart for this vendor only
+    await db.carts.delete_one({"user_id": current_user.user_id, "vendor_id": order_data.vendor_id})
     
+    # Return full order details for invoice
     return {
         "message": "Order placed successfully",
-        "order_id": order["order_id"],
-        "grand_total": order["grand_total"]
+        "order": order
     }
 
 @api_router.get("/orders")
 async def get_orders(current_user: User = Depends(require_auth)):
-    """Get user's orders"""
+    """Get user's orders with vendor details"""
     orders = await db.shop_orders.find(
         {"user_id": current_user.user_id},
         {"_id": 0}
@@ -891,14 +912,66 @@ async def get_orders(current_user: User = Depends(require_auth)):
 
 @api_router.get("/orders/{order_id}")
 async def get_order_details(order_id: str, current_user: User = Depends(require_auth)):
-    """Get order details"""
+    """Get detailed order information including tracking"""
     order = await db.shop_orders.find_one(
         {"order_id": order_id, "user_id": current_user.user_id},
         {"_id": 0}
     )
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Get linked delivery wish if exists
+    delivery_wish = await db.wishes.find_one(
+        {"linked_order_id": order_id},
+        {"_id": 0}
+    )
+    if delivery_wish:
+        order["delivery_wish"] = delivery_wish
+    
     return order
+
+@api_router.put("/orders/{order_id}/status")
+async def update_order_status(order_id: str, status: str, agent_location: Optional[dict] = None):
+    """Update order status (for vendors/agents)"""
+    valid_statuses = ["confirmed", "preparing", "ready", "picked_up", "on_the_way", "nearby", "delivered", "cancelled"]
+    if status not in valid_statuses:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    
+    update_data = {
+        "status": status,
+        "$push": {
+            "status_history": {
+                "status": status,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "message": f"Order {status.replace('_', ' ')}"
+            }
+        }
+    }
+    
+    if agent_location:
+        update_data["agent_location"] = agent_location
+    
+    await db.shop_orders.update_one(
+        {"order_id": order_id},
+        {"$set": {"status": status, "agent_location": agent_location} if agent_location else {"$set": {"status": status}}}
+    )
+    
+    # Also push to status history
+    await db.shop_orders.update_one(
+        {"order_id": order_id},
+        {"$push": {"status_history": {"status": status, "timestamp": datetime.now(timezone.utc).isoformat()}}}
+    )
+    
+    return {"message": f"Order status updated to {status}"}
+
+@api_router.put("/orders/{order_id}/agent-location")
+async def update_agent_location(order_id: str, location: dict):
+    """Update delivery agent's live location"""
+    await db.shop_orders.update_one(
+        {"order_id": order_id},
+        {"$set": {"agent_location": location}}
+    )
+    return {"message": "Location updated"}
 
 # ===================== SEED DATA =====================
 
