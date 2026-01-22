@@ -2585,4 +2585,257 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '80%',
   },
+  // Phase 4: Expandable Deal Summary Styles
+  dealSummaryHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dealSummaryHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dealSummaryPreview: {
+    paddingTop: 8,
+  },
+  dealSummaryPreviewText: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  dealSummaryExpanded: {
+    paddingTop: 12,
+  },
+  dealAgentSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 12,
+  },
+  dealAgentAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dealAgentAvatarText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  dealAgentInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  dealAgentName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  dealAgentBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  agentBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  agentBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  dealDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 12,
+  },
+  dealDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+  },
+  dealDetailIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  dealDetailContent: {
+    flex: 1,
+  },
+  dealDetailLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginBottom: 2,
+  },
+  dealDetailValue: {
+    fontSize: 14,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  dealDetailPriceValue: {
+    fontSize: 18,
+    color: '#10B981',
+    fontWeight: '700',
+  },
+  encryptionNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 12,
+    gap: 6,
+  },
+  encryptionText: {
+    fontSize: 11,
+    color: '#9CA3AF',
+  },
+  // Phase 4: Celebration Overlay
+  celebrationOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  celebrationContent: {
+    alignItems: 'center',
+  },
+  celebrationEmoji: {
+    fontSize: 80,
+    marginBottom: 20,
+  },
+  celebrationTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  celebrationSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  confettiContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  confetti: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+  },
+  // Phase 4: Rating Modal
+  ratingModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  ratingHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  ratingEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  ratingTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  ratingSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  starButton: {
+    padding: 6,
+  },
+  ratingLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  reviewInput: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 15,
+    color: '#1F2937',
+    minHeight: 100,
+    textAlignVertical: 'top',
+    marginBottom: 16,
+  },
+  quickTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 24,
+  },
+  quickTag: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  quickTagText: {
+    fontSize: 13,
+    color: '#6366F1',
+    fontWeight: '500',
+  },
+  ratingActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  ratingSkipButton: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+  },
+  ratingSkipText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  ratingSubmitButton: {
+    flex: 2,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: '#6366F1',
+  },
+  ratingSubmitDisabled: {
+    backgroundColor: '#D1D5DB',
+  },
+  ratingSubmitText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
 });
