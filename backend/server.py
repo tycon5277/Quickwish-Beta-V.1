@@ -964,6 +964,191 @@ async def seed_data():
     
     return {"message": "Sample data seeded successfully"}
 
+@api_router.post("/seed/hubvendors")
+async def seed_hub_vendors():
+    """Seed 7 sample hub vendors with products for testing"""
+    
+    # Define 7 different shops
+    hub_vendors = [
+        {
+            "vendor_id": "vendor_fresh_mart",
+            "name": "Fresh Mart Grocery",
+            "description": "Your one-stop shop for fresh groceries, dairy, and household essentials. Quality products at affordable prices.",
+            "category": "Grocery",
+            "image": "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=400",
+            "rating": 4.8,
+            "total_ratings": 1247,
+            "location": {"lat": 12.9716, "lng": 77.5946, "address": "Shop 12, Central Market, Sector 5"},
+            "contact_phone": "+91 98765 43210",
+            "opening_hours": "7:00 AM - 10:00 PM",
+            "has_own_delivery": True,
+            "delivery_radius_km": 5.0,
+            "is_verified": True,
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "vendor_id": "vendor_biryani_house",
+            "name": "Hyderabadi Biryani House",
+            "description": "Authentic Hyderabadi dum biryani made with aromatic basmati rice and tender meat. Family recipes since 1985.",
+            "category": "Restaurant",
+            "image": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400",
+            "rating": 4.9,
+            "total_ratings": 2341,
+            "location": {"lat": 12.9720, "lng": 77.5950, "address": "15, Food Street, Block B"},
+            "contact_phone": "+91 98765 43211",
+            "opening_hours": "11:00 AM - 11:00 PM",
+            "has_own_delivery": True,
+            "delivery_radius_km": 8.0,
+            "is_verified": True,
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "vendor_id": "vendor_medplus",
+            "name": "MedPlus Pharmacy",
+            "description": "Certified pharmacy with 24/7 service. Prescription medicines, healthcare products, and free health checkups.",
+            "category": "Pharmacy",
+            "image": "https://images.unsplash.com/photo-1576602976047-174e57a47881?w=400",
+            "rating": 4.7,
+            "total_ratings": 892,
+            "location": {"lat": 12.9718, "lng": 77.5948, "address": "Ground Floor, Healthcare Complex"},
+            "contact_phone": "+91 98765 43212",
+            "opening_hours": "24 Hours",
+            "has_own_delivery": False,
+            "delivery_radius_km": 3.0,
+            "is_verified": True,
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "vendor_id": "vendor_tech_zone",
+            "name": "Tech Zone Electronics",
+            "description": "Latest gadgets, mobile accessories, and electronics. Authorized service center for major brands.",
+            "category": "Electronics",
+            "image": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400",
+            "rating": 4.5,
+            "total_ratings": 567,
+            "location": {"lat": 12.9725, "lng": 77.5955, "address": "Shop 45, Tech Mall, Level 2"},
+            "contact_phone": "+91 98765 43213",
+            "opening_hours": "10:00 AM - 9:00 PM",
+            "has_own_delivery": False,
+            "delivery_radius_km": 10.0,
+            "is_verified": True,
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "vendor_id": "vendor_fashion_hub",
+            "name": "Fashion Hub",
+            "description": "Trendy clothing and accessories for men, women, and kids. Latest fashion at unbeatable prices.",
+            "category": "Fashion",
+            "image": "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=400",
+            "rating": 4.4,
+            "total_ratings": 423,
+            "location": {"lat": 12.9712, "lng": 77.5942, "address": "Fashion Street, Shop 8-10"},
+            "contact_phone": "+91 98765 43214",
+            "opening_hours": "10:00 AM - 9:00 PM",
+            "has_own_delivery": False,
+            "delivery_radius_km": 5.0,
+            "is_verified": False,
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "vendor_id": "vendor_green_garden",
+            "name": "Green Garden Nursery",
+            "description": "Beautiful plants, seeds, gardening tools, and expert advice. Transform your space with greenery!",
+            "category": "Garden & Plants",
+            "image": "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400",
+            "rating": 4.8,
+            "total_ratings": 234,
+            "location": {"lat": 12.9730, "lng": 77.5960, "address": "Green Zone, Sector 7"},
+            "contact_phone": "+91 98765 43215",
+            "opening_hours": "8:00 AM - 7:00 PM",
+            "has_own_delivery": True,
+            "delivery_radius_km": 7.0,
+            "is_verified": True,
+            "created_at": datetime.now(timezone.utc)
+        },
+        {
+            "vendor_id": "vendor_sweet_treats",
+            "name": "Sweet Treats Bakery",
+            "description": "Freshly baked cakes, pastries, cookies, and artisan breads. Custom cakes for all occasions!",
+            "category": "Bakery",
+            "image": "https://images.unsplash.com/photo-1517433670267-30f41c09a4be?w=400",
+            "rating": 4.9,
+            "total_ratings": 1876,
+            "location": {"lat": 12.9708, "lng": 77.5938, "address": "Sweet Corner, Main Road"},
+            "contact_phone": "+91 98765 43216",
+            "opening_hours": "8:00 AM - 10:00 PM",
+            "has_own_delivery": True,
+            "delivery_radius_km": 6.0,
+            "is_verified": True,
+            "created_at": datetime.now(timezone.utc)
+        }
+    ]
+    
+    # Define products for each vendor
+    products = [
+        # Fresh Mart Grocery Products
+        {"product_id": "prod_fm_001", "vendor_id": "vendor_fresh_mart", "name": "Basmati Rice Premium (5kg)", "description": "Long grain aromatic basmati rice, perfect for biryani and pulao", "price": 450, "discounted_price": 399, "images": ["https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400", "https://images.unsplash.com/photo-1536304993881-ff6e9eefa2a6?w=400"], "category": "Rice & Grains", "stock": 50, "likes": 234, "rating": 4.7, "total_ratings": 89},
+        {"product_id": "prod_fm_002", "vendor_id": "vendor_fresh_mart", "name": "Toor Dal (1kg)", "description": "Pure and clean toor dal, rich in protein", "price": 180, "discounted_price": 165, "images": ["https://images.unsplash.com/photo-1585032226651-759b368d7246?w=400"], "category": "Pulses", "stock": 100, "likes": 156, "rating": 4.6, "total_ratings": 67},
+        {"product_id": "prod_fm_003", "vendor_id": "vendor_fresh_mart", "name": "Fresh Milk (1L)", "description": "Farm fresh pasteurized milk", "price": 65, "discounted_price": None, "images": ["https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400"], "category": "Dairy", "stock": 200, "likes": 89, "rating": 4.8, "total_ratings": 234},
+        {"product_id": "prod_fm_004", "vendor_id": "vendor_fresh_mart", "name": "Organic Honey (500g)", "description": "100% pure organic honey from forest bees", "price": 450, "discounted_price": 399, "images": ["https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=400"], "category": "Organic", "stock": 30, "likes": 445, "rating": 4.9, "total_ratings": 156},
+        
+        # Biryani House Products
+        {"product_id": "prod_bh_001", "vendor_id": "vendor_biryani_house", "name": "Chicken Dum Biryani (Full)", "description": "Authentic Hyderabadi chicken biryani with raita and salan", "price": 450, "discounted_price": None, "images": ["https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400", "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=400"], "category": "Biryani", "stock": 50, "likes": 1234, "rating": 4.9, "total_ratings": 567},
+        {"product_id": "prod_bh_002", "vendor_id": "vendor_biryani_house", "name": "Mutton Dum Biryani (Full)", "description": "Tender mutton pieces in aromatic rice", "price": 550, "discounted_price": None, "images": ["https://images.unsplash.com/photo-1633945274405-b6c8069047b0?w=400"], "category": "Biryani", "stock": 30, "likes": 987, "rating": 4.9, "total_ratings": 432},
+        {"product_id": "prod_bh_003", "vendor_id": "vendor_biryani_house", "name": "Veg Biryani (Full)", "description": "Flavorful vegetable biryani with fresh veggies", "price": 280, "discounted_price": 250, "images": ["https://images.unsplash.com/photo-1599043513900-ed6fe01d3833?w=400"], "category": "Biryani", "stock": 40, "likes": 567, "rating": 4.7, "total_ratings": 234},
+        {"product_id": "prod_bh_004", "vendor_id": "vendor_biryani_house", "name": "Chicken 65", "description": "Crispy spiced chicken starter", "price": 250, "discounted_price": None, "images": ["https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?w=400"], "category": "Starters", "stock": 60, "likes": 789, "rating": 4.8, "total_ratings": 345},
+        
+        # MedPlus Pharmacy Products
+        {"product_id": "prod_mp_001", "vendor_id": "vendor_medplus", "name": "Crocin Advance 500mg (15 tabs)", "description": "Fast relief from headache and fever", "price": 45, "discounted_price": None, "images": ["https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400"], "category": "Pain Relief", "stock": 200, "likes": 234, "rating": 4.5, "total_ratings": 123},
+        {"product_id": "prod_mp_002", "vendor_id": "vendor_medplus", "name": "Vitamin C 1000mg (30 tabs)", "description": "Boost immunity with high-strength Vitamin C", "price": 350, "discounted_price": 299, "images": ["https://images.unsplash.com/photo-1550572017-edd951aa8f72?w=400"], "category": "Vitamins", "stock": 100, "likes": 456, "rating": 4.7, "total_ratings": 189},
+        {"product_id": "prod_mp_003", "vendor_id": "vendor_medplus", "name": "Digital Thermometer", "description": "Accurate digital thermometer with memory function", "price": 299, "discounted_price": 249, "images": ["https://images.unsplash.com/photo-1584362917165-526a968ae5c6?w=400"], "category": "Medical Devices", "stock": 50, "likes": 123, "rating": 4.6, "total_ratings": 78},
+        
+        # Tech Zone Products
+        {"product_id": "prod_tz_001", "vendor_id": "vendor_tech_zone", "name": "Wireless Earbuds Pro", "description": "Premium wireless earbuds with active noise cancellation", "price": 2999, "discounted_price": 2499, "images": ["https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=400", "https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?w=400"], "category": "Audio", "stock": 25, "likes": 678, "rating": 4.6, "total_ratings": 234},
+        {"product_id": "prod_tz_002", "vendor_id": "vendor_tech_zone", "name": "USB-C Fast Charger 65W", "description": "Universal fast charger for laptops and phones", "price": 1299, "discounted_price": 999, "images": ["https://images.unsplash.com/photo-1583863788434-e58a36330cf0?w=400"], "category": "Chargers", "stock": 40, "likes": 345, "rating": 4.5, "total_ratings": 156},
+        {"product_id": "prod_tz_003", "vendor_id": "vendor_tech_zone", "name": "Smartphone Gimbal Stabilizer", "description": "3-axis gimbal for smooth video recording", "price": 4999, "discounted_price": 3999, "images": ["https://images.unsplash.com/photo-1598346762291-aee88549193f?w=400"], "category": "Accessories", "stock": 15, "likes": 234, "rating": 4.7, "total_ratings": 89},
+        
+        # Fashion Hub Products
+        {"product_id": "prod_fh_001", "vendor_id": "vendor_fashion_hub", "name": "Men's Cotton Casual Shirt", "description": "Breathable cotton shirt, perfect for everyday wear", "price": 899, "discounted_price": 699, "images": ["https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400", "https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=400"], "category": "Men's Wear", "stock": 50, "likes": 345, "rating": 4.4, "total_ratings": 123},
+        {"product_id": "prod_fh_002", "vendor_id": "vendor_fashion_hub", "name": "Women's Kurti Set", "description": "Elegant cotton kurti with matching dupatta", "price": 1299, "discounted_price": 999, "images": ["https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=400"], "category": "Women's Wear", "stock": 30, "likes": 567, "rating": 4.5, "total_ratings": 234},
+        {"product_id": "prod_fh_003", "vendor_id": "vendor_fashion_hub", "name": "Kids Party Dress", "description": "Beautiful party dress for girls, age 5-8 years", "price": 799, "discounted_price": 599, "images": ["https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=400"], "category": "Kids Wear", "stock": 25, "likes": 234, "rating": 4.6, "total_ratings": 89},
+        
+        # Green Garden Products
+        {"product_id": "prod_gg_001", "vendor_id": "vendor_green_garden", "name": "Money Plant (Potted)", "description": "Lucky money plant in decorative ceramic pot", "price": 299, "discounted_price": 249, "images": ["https://images.unsplash.com/photo-1459411552884-841db9b3cc2a?w=400", "https://images.unsplash.com/photo-1463936575829-25148e1db1b8?w=400"], "category": "Indoor Plants", "stock": 40, "likes": 456, "rating": 4.8, "total_ratings": 178},
+        {"product_id": "prod_gg_002", "vendor_id": "vendor_green_garden", "name": "Rose Plant (Red)", "description": "Beautiful red rose plant, blooming variety", "price": 199, "discounted_price": None, "images": ["https://images.unsplash.com/photo-1455659817273-f96807779a8a?w=400"], "category": "Flowering Plants", "stock": 30, "likes": 678, "rating": 4.7, "total_ratings": 234},
+        {"product_id": "prod_gg_003", "vendor_id": "vendor_green_garden", "name": "Gardening Tool Set", "description": "Complete 5-piece gardening tool set", "price": 599, "discounted_price": 499, "images": ["https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400"], "category": "Tools", "stock": 20, "likes": 234, "rating": 4.6, "total_ratings": 89},
+        
+        # Sweet Treats Products
+        {"product_id": "prod_st_001", "vendor_id": "vendor_sweet_treats", "name": "Chocolate Truffle Cake (1kg)", "description": "Rich chocolate truffle cake with ganache frosting", "price": 899, "discounted_price": None, "images": ["https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400", "https://images.unsplash.com/photo-1606890737304-57a1ca8a5b62?w=400"], "category": "Cakes", "stock": 20, "likes": 1234, "rating": 4.9, "total_ratings": 567},
+        {"product_id": "prod_st_002", "vendor_id": "vendor_sweet_treats", "name": "Assorted Cookies Box (500g)", "description": "Mix of chocolate chip, butter, and oatmeal cookies", "price": 399, "discounted_price": 349, "images": ["https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=400"], "category": "Cookies", "stock": 50, "likes": 567, "rating": 4.7, "total_ratings": 234},
+        {"product_id": "prod_st_003", "vendor_id": "vendor_sweet_treats", "name": "Fresh Croissants (4 pcs)", "description": "Buttery French croissants, baked fresh daily", "price": 180, "discounted_price": None, "images": ["https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400"], "category": "Bakery", "stock": 30, "likes": 345, "rating": 4.8, "total_ratings": 156},
+        {"product_id": "prod_st_004", "vendor_id": "vendor_sweet_treats", "name": "Red Velvet Cupcakes (6 pcs)", "description": "Classic red velvet cupcakes with cream cheese frosting", "price": 350, "discounted_price": 299, "images": ["https://images.unsplash.com/photo-1614707267537-b85aaf00c4b7?w=400"], "category": "Cupcakes", "stock": 25, "likes": 789, "rating": 4.9, "total_ratings": 345}
+    ]
+    
+    # Insert vendors
+    for vendor in hub_vendors:
+        await db.hub_vendors.update_one(
+            {"vendor_id": vendor["vendor_id"]},
+            {"$set": vendor},
+            upsert=True
+        )
+    
+    # Insert products
+    for product in products:
+        product["is_available"] = True
+        product["created_at"] = datetime.now(timezone.utc)
+        await db.products.update_one(
+            {"product_id": product["product_id"]},
+            {"$set": product},
+            upsert=True
+        )
+    
+    return {
+        "message": "Hub vendors seeded successfully!",
+        "vendors_created": len(hub_vendors),
+        "products_created": len(products)
+    }
+
 @api_router.post("/seed/chats")
 async def seed_chat_data(current_user: User = Depends(require_auth)):
     """Seed sample chat data for testing the chat UI"""
