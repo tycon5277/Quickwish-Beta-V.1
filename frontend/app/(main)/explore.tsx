@@ -1,14 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, Image, Dimensions, Modal } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Image, Dimensions, Modal, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import axios from 'axios';
-import Constants from 'expo-constants';
-
-const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
-                   process.env.EXPO_PUBLIC_BACKEND_URL || 
-                   'https://quickwish-3.preview.emergentagent.com';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -42,6 +36,8 @@ interface FeedPost {
   tags?: string[];
   milestone?: string;
   promo_link?: string;
+  rating?: number;
+  completedJobs?: number;
 }
 
 // Sample Stories Data
@@ -65,12 +61,14 @@ const FEED_POSTS: FeedPost[] = [
     creator_category: 'Bike Delivery',
     is_verified: true,
     images: ['https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600', 'https://images.unsplash.com/photo-1526367790999-0150786686a2?w=600'],
-    caption: 'Just completed my 1000th delivery! 🎉 Thank you all for trusting me with your packages. From groceries to medicines, I\'ve delivered it all with care. Here\'s to the next 1000! 🚴‍♂️💨',
+    caption: 'Just completed my 1000th delivery! 🎉 Thank you all for trusting me with your packages. From groceries to medicines, I\'ve delivered it all with care.',
     likes: 234,
     comments: 45,
     timestamp: '2h ago',
-    tags: ['#1000Deliveries', '#LocalHero', '#BikeDelivery'],
-    milestone: '🏆 1000 Deliveries',
+    tags: ['#1000Deliveries', '#LocalHero'],
+    milestone: '1000 Deliveries',
+    rating: 4.9,
+    completedJobs: 1000,
   },
   {
     id: 'p2',
@@ -80,11 +78,12 @@ const FEED_POSTS: FeedPost[] = [
     creator_category: 'Grocery Store',
     is_verified: true,
     images: ['https://images.unsplash.com/photo-1542838132-92c53300491e?w=600'],
-    caption: '🍎 Fresh arrivals! Organic fruits and vegetables directly from local farms. Order now and get 20% off on your first purchase! Use code: FRESH20',
+    caption: '🍎 Fresh arrivals! Organic fruits and vegetables directly from local farms. Order now and get 20% off!',
     likes: 156,
     comments: 23,
     timestamp: '4h ago',
-    tags: ['#Organic', '#FreshProduce', '#LocalFarm'],
+    tags: ['#Organic', '#FreshProduce'],
+    rating: 4.7,
   },
   {
     id: 'p3',
@@ -94,11 +93,11 @@ const FEED_POSTS: FeedPost[] = [
     creator_category: 'Travel Organizer',
     is_verified: false,
     images: ['https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=600', 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=600', 'https://images.unsplash.com/photo-1530789253388-582c481c54b0?w=600'],
-    caption: '🚌 Weekend Trip Alert! This Saturday we\'re heading to Coorg - the Scotland of India! Mini bus trip with 12 seats available.\n\n✅ Pickup from city center\n✅ Breakfast included\n✅ Professional guide\n\nDM or book through QuickWish!',
+    caption: '🚌 Weekend Trip Alert! This Saturday we\'re heading to Coorg! Mini bus trip with 12 seats available. Pickup from city center, breakfast included!',
     likes: 89,
     comments: 34,
     timestamp: '6h ago',
-    tags: ['#WeekendTrip', '#Coorg', '#TravelWithUs'],
+    tags: ['#WeekendTrip', '#Coorg'],
     promo_link: 'Book Now',
   },
   {
@@ -109,11 +108,12 @@ const FEED_POSTS: FeedPost[] = [
     creator_category: 'Home Cleaning',
     is_verified: true,
     images: ['https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'],
-    caption: 'Transform your space! ✨ Professional deep cleaning services now available. We handle everything from kitchen degreasing to bathroom sanitization.\n\nBook your slot today and get a free carpet steam clean!',
+    caption: 'Transform your space! ✨ Professional deep cleaning services now available. Book your slot today!',
     likes: 67,
     comments: 12,
     timestamp: '8h ago',
-    tags: ['#DeepCleaning', '#HomeServices', '#SparkleClean'],
+    rating: 4.8,
+    completedJobs: 245,
   },
   {
     id: 'p5',
@@ -123,46 +123,43 @@ const FEED_POSTS: FeedPost[] = [
     creator_category: 'Fitness Coach',
     is_verified: true,
     images: ['https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600', 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=600'],
-    caption: '💪 New Year, New You! Join our 30-day transformation challenge. Personal training sessions now available at your doorstep or through video calls.\n\nFirst session FREE for QuickWish users!',
+    caption: '💪 New Year, New You! Join our 30-day transformation challenge. Personal training at your doorstep!',
     likes: 198,
     comments: 56,
     timestamp: '1d ago',
-    tags: ['#FitnessChallenge', '#PersonalTrainer', '#HomeWorkout'],
     promo_link: 'Join Challenge',
   },
 ];
 
 // Creator type configurations
-const CREATOR_CONFIG: Record<CreatorType, { label: string; color: string; bgColor: string; icon: string }> = {
-  agent: { label: 'Agent', color: '#10B981', bgColor: '#D1FAE5', icon: 'bicycle' },
-  vendor: { label: 'Vendor', color: '#3B82F6', bgColor: '#DBEAFE', icon: 'storefront' },
-  promoter: { label: 'Promoter', color: '#8B5CF6', bgColor: '#EDE9FE', icon: 'megaphone' },
+const CREATOR_CONFIG: Record<CreatorType, { label: string; color: string; bgColor: string; icon: string; gradient: string[] }> = {
+  agent: { label: 'Agent', color: '#10B981', bgColor: '#D1FAE5', icon: 'flash', gradient: ['#10B981', '#059669'] },
+  vendor: { label: 'Vendor', color: '#3B82F6', bgColor: '#DBEAFE', icon: 'storefront', gradient: ['#3B82F6', '#2563EB'] },
+  promoter: { label: 'Promoter', color: '#8B5CF6', bgColor: '#EDE9FE', icon: 'megaphone', gradient: ['#8B5CF6', '#7C3AED'] },
 };
 
-// Category filters
-const CATEGORIES = [
-  { id: 'all', label: 'All', icon: 'grid' },
-  { id: 'agent', label: 'Agents', icon: 'bicycle' },
-  { id: 'vendor', label: 'Vendors', icon: 'storefront' },
-  { id: 'promoter', label: 'Promoters', icon: 'megaphone' },
-  { id: 'milestone', label: 'Milestones', icon: 'trophy' },
-  { id: 'deals', label: 'Deals', icon: 'pricetag' },
+// Search filter categories
+const SEARCH_CATEGORIES = [
+  { id: 'all', label: 'All' },
+  { id: 'agent', label: 'Agents' },
+  { id: 'vendor', label: 'Vendors' },
+  { id: 'promoter', label: 'Promoters' },
 ];
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [posts, setPosts] = useState<FeedPost[]>(FEED_POSTS);
-  const [stories, setStories] = useState<Story[]>(STORIES);
+  const [posts] = useState<FeedPost[]>(FEED_POSTS);
+  const [stories] = useState<Story[]>(STORIES);
   const [refreshing, setRefreshing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState<Record<string, number>>({});
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchCategory, setSearchCategory] = useState('all');
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // Simulate refresh
     await new Promise(resolve => setTimeout(resolve, 1000));
     setRefreshing(false);
   };
@@ -179,14 +176,6 @@ export default function ExploreScreen() {
     });
   };
 
-  const filteredPosts = selectedCategory === 'all' 
-    ? posts 
-    : selectedCategory === 'milestone'
-    ? posts.filter(p => p.milestone)
-    : selectedCategory === 'deals'
-    ? posts.filter(p => p.promo_link)
-    : posts.filter(p => p.creator_type === selectedCategory);
-
   const nextImage = (postId: string, totalImages: number) => {
     setCurrentImageIndex(prev => ({
       ...prev,
@@ -194,29 +183,38 @@ export default function ExploreScreen() {
     }));
   };
 
-  const prevImage = (postId: string, totalImages: number) => {
-    setCurrentImageIndex(prev => ({
-      ...prev,
-      [postId]: ((prev[postId] || 0) - 1 + totalImages) % totalImages
-    }));
+  const getFilteredSearchResults = () => {
+    let filtered = posts;
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(p => 
+        p.creator_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.caption.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.creator_category.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    if (searchCategory !== 'all') {
+      filtered = filtered.filter(p => p.creator_type === searchCategory);
+    }
+    return filtered;
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Explore</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerButton}>
-            <Ionicons name="search" size={22} color="#1F2937" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            <Ionicons name="notifications-outline" size={22} color="#1F2937" />
-            <View style={styles.notifBadge}>
-              <Text style={styles.notifBadgeText}>3</Text>
-            </View>
-          </TouchableOpacity>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>Explore</Text>
+          <View style={styles.headerBadge}>
+            <Ionicons name="sparkles" size={12} color="#10B981" />
+          </View>
         </View>
+        <TouchableOpacity 
+          style={styles.searchButton}
+          onPress={() => setShowSearch(true)}
+        >
+          <Ionicons name="search" size={20} color="#6B7280" />
+          <Text style={styles.searchPlaceholder}>Search creators...</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -228,25 +226,12 @@ export default function ExploreScreen() {
       >
         {/* Stories Section */}
         <View style={styles.storiesSection}>
+          <Text style={styles.sectionLabel}>HIGHLIGHTS</Text>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.storiesContainer}
           >
-            {/* Your Story */}
-            <TouchableOpacity style={styles.storyItem}>
-              <View style={styles.addStoryWrapper}>
-                <LinearGradient
-                  colors={['#10B981', '#059669']}
-                  style={styles.addStoryGradient}
-                >
-                  <Ionicons name="add" size={28} color="#fff" />
-                </LinearGradient>
-              </View>
-              <Text style={styles.storyName}>Add Story</Text>
-            </TouchableOpacity>
-
-            {/* Other Stories */}
             {stories.map((story) => {
               const config = CREATOR_CONFIG[story.creator_type];
               return (
@@ -255,218 +240,167 @@ export default function ExploreScreen() {
                   style={styles.storyItem}
                   onPress={() => setSelectedStory(story)}
                 >
-                  <View style={[
-                    styles.storyRing,
-                    story.has_unseen && { borderColor: config.color },
-                    story.is_live && styles.storyRingLive
-                  ]}>
-                    <Image source={{ uri: story.user_image }} style={styles.storyAvatar} />
-                    {story.is_live && (
-                      <View style={styles.liveBadge}>
-                        <Text style={styles.liveBadgeText}>LIVE</Text>
-                      </View>
-                    )}
-                  </View>
+                  <LinearGradient
+                    colors={story.has_unseen ? config.gradient as any : ['#E5E7EB', '#D1D5DB']}
+                    style={styles.storyRing}
+                  >
+                    <View style={styles.storyAvatarWrapper}>
+                      <Image source={{ uri: story.user_image }} style={styles.storyAvatar} />
+                    </View>
+                  </LinearGradient>
+                  {story.is_live && (
+                    <View style={styles.liveBadge}>
+                      <Text style={styles.liveBadgeText}>LIVE</Text>
+                    </View>
+                  )}
                   <Text style={styles.storyName} numberOfLines={1}>{story.user_name}</Text>
-                  <View style={[styles.storyTypeBadge, { backgroundColor: config.bgColor }]}>
-                    <Ionicons name={config.icon as any} size={8} color={config.color} />
-                  </View>
+                  <Text style={styles.storyCategory} numberOfLines={1}>{story.category}</Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
         </View>
 
-        {/* Category Filter */}
-        <View style={styles.categorySection}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryContainer}
-          >
-            {CATEGORIES.map((cat) => {
-              const isSelected = selectedCategory === cat.id;
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.categoryPill, isSelected && styles.categoryPillSelected]}
-                  onPress={() => setSelectedCategory(cat.id)}
-                >
-                  <Ionicons 
-                    name={cat.icon as any} 
-                    size={14} 
-                    color={isSelected ? '#fff' : '#6B7280'} 
-                  />
-                  <Text style={[styles.categoryText, isSelected && styles.categoryTextSelected]}>
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* Feed Posts */}
+        {/* Feed Section */}
         <View style={styles.feedSection}>
-          {filteredPosts.map((post) => {
+          <Text style={styles.sectionLabel}>DISCOVER</Text>
+          
+          {posts.map((post) => {
             const config = CREATOR_CONFIG[post.creator_type];
             const isLiked = likedPosts.has(post.id);
             const currentImg = currentImageIndex[post.id] || 0;
 
             return (
               <View key={post.id} style={styles.postCard}>
-                {/* Post Header */}
-                <View style={styles.postHeader}>
-                  <TouchableOpacity style={styles.postCreatorInfo}>
-                    <View style={[styles.creatorAvatarWrapper, { borderColor: config.color }]}>
-                      <Image source={{ uri: post.creator_image }} style={styles.creatorAvatar} />
-                    </View>
-                    <View style={styles.creatorDetails}>
-                      <View style={styles.creatorNameRow}>
-                        <Text style={styles.creatorName}>{post.creator_name}</Text>
-                        {post.is_verified && (
-                          <Ionicons name="checkmark-circle" size={14} color="#3B82F6" />
-                        )}
-                      </View>
-                      <View style={styles.creatorMeta}>
-                        <View style={[styles.creatorTypeBadge, { backgroundColor: config.bgColor }]}>
-                          <Ionicons name={config.icon as any} size={10} color={config.color} />
-                          <Text style={[styles.creatorTypeText, { color: config.color }]}>
-                            {config.label}
-                          </Text>
-                        </View>
-                        <Text style={styles.creatorCategory}>• {post.creator_category}</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.moreButton}>
-                    <Ionicons name="ellipsis-horizontal" size={20} color="#6B7280" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Milestone Badge */}
-                {post.milestone && (
-                  <View style={styles.milestoneBanner}>
-                    <LinearGradient
-                      colors={['#F59E0B', '#D97706']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.milestoneGradient}
-                    >
-                      <Ionicons name="trophy" size={16} color="#fff" />
-                      <Text style={styles.milestoneText}>{post.milestone}</Text>
-                    </LinearGradient>
-                  </View>
-                )}
-
-                {/* Post Images */}
-                <View style={styles.postImageContainer}>
+                {/* Post Image with Overlay */}
+                <TouchableOpacity 
+                  style={styles.postImageContainer}
+                  onPress={() => post.images.length > 1 && nextImage(post.id, post.images.length)}
+                  activeOpacity={0.95}
+                >
                   <Image 
                     source={{ uri: post.images[currentImg] }} 
                     style={styles.postImage}
                     resizeMode="cover"
                   />
                   
-                  {/* Image Navigation */}
-                  {post.images.length > 1 && (
-                    <>
-                      <TouchableOpacity 
-                        style={[styles.imageNav, styles.imageNavLeft]}
-                        onPress={() => prevImage(post.id, post.images.length)}
-                      >
-                        <Ionicons name="chevron-back" size={24} color="#fff" />
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={[styles.imageNav, styles.imageNavRight]}
-                        onPress={() => nextImage(post.id, post.images.length)}
-                      >
-                        <Ionicons name="chevron-forward" size={24} color="#fff" />
-                      </TouchableOpacity>
-                      
-                      {/* Image Indicators */}
-                      <View style={styles.imageIndicators}>
-                        {post.images.map((_, idx) => (
-                          <View 
-                            key={idx}
-                            style={[styles.imageIndicator, currentImg === idx && styles.imageIndicatorActive]}
-                          />
-                        ))}
+                  {/* Gradient Overlay */}
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.7)']}
+                    style={styles.imageOverlay}
+                  >
+                    {/* Creator Info on Image */}
+                    <View style={styles.creatorOverlay}>
+                      <View style={styles.creatorRow}>
+                        <Image source={{ uri: post.creator_image }} style={styles.creatorAvatar} />
+                        <View style={styles.creatorInfo}>
+                          <View style={styles.creatorNameRow}>
+                            <Text style={styles.creatorName}>{post.creator_name}</Text>
+                            {post.is_verified && (
+                              <View style={styles.verifiedBadge}>
+                                <Ionicons name="checkmark" size={10} color="#fff" />
+                              </View>
+                            )}
+                          </View>
+                          <View style={styles.creatorMeta}>
+                            <View style={[styles.typeBadge, { backgroundColor: config.color }]}>
+                              <Ionicons name={config.icon as any} size={10} color="#fff" />
+                              <Text style={styles.typeBadgeText}>{config.label}</Text>
+                            </View>
+                            <Text style={styles.categoryText}>{post.creator_category}</Text>
+                          </View>
+                        </View>
                       </View>
-                    </>
-                  )}
 
-                  {/* Image Count Badge */}
-                  {post.images.length > 1 && (
-                    <View style={styles.imageCountBadge}>
-                      <Text style={styles.imageCountText}>{currentImg + 1}/{post.images.length}</Text>
+                      {/* Stats Row */}
+                      {(post.rating || post.completedJobs) && (
+                        <View style={styles.statsRow}>
+                          {post.rating && (
+                            <View style={styles.statItem}>
+                              <Ionicons name="star" size={14} color="#F59E0B" />
+                              <Text style={styles.statValue}>{post.rating}</Text>
+                            </View>
+                          )}
+                          {post.completedJobs && (
+                            <View style={styles.statItem}>
+                              <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                              <Text style={styles.statValue}>{post.completedJobs} done</Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  </LinearGradient>
+
+                  {/* Milestone Badge */}
+                  {post.milestone && (
+                    <View style={styles.milestoneBadge}>
+                      <Ionicons name="trophy" size={14} color="#F59E0B" />
+                      <Text style={styles.milestoneText}>{post.milestone}</Text>
                     </View>
                   )}
-                </View>
 
-                {/* Action Bar */}
-                <View style={styles.actionBar}>
-                  <View style={styles.actionLeft}>
-                    <TouchableOpacity 
-                      style={styles.actionButton}
-                      onPress={() => toggleLike(post.id)}
-                    >
-                      <Ionicons 
-                        name={isLiked ? "heart" : "heart-outline"} 
-                        size={26} 
-                        color={isLiked ? "#EF4444" : "#1F2937"} 
-                      />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton}>
-                      <Ionicons name="chatbubble-outline" size={24} color="#1F2937" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton}>
-                      <Ionicons name="paper-plane-outline" size={24} color="#1F2937" />
-                    </TouchableOpacity>
-                  </View>
-                  <TouchableOpacity style={styles.actionButton}>
-                    <Ionicons name="bookmark-outline" size={24} color="#1F2937" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Likes */}
-                <Text style={styles.likesText}>
-                  {post.likes + (isLiked ? 1 : 0)} likes
-                </Text>
-
-                {/* Caption */}
-                <View style={styles.captionContainer}>
-                  <Text style={styles.captionText}>
-                    <Text style={styles.captionUsername}>{post.creator_name} </Text>
-                    {post.caption}
-                  </Text>
-                </View>
-
-                {/* Tags */}
-                {post.tags && (
-                  <View style={styles.tagsContainer}>
-                    {post.tags.map((tag, idx) => (
-                      <TouchableOpacity key={idx}>
-                        <Text style={styles.tagText}>{tag}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-
-                {/* Promo Link */}
-                {post.promo_link && (
-                  <TouchableOpacity style={styles.promoButton}>
-                    <Text style={styles.promoButtonText}>{post.promo_link}</Text>
-                    <Ionicons name="arrow-forward" size={16} color="#fff" />
-                  </TouchableOpacity>
-                )}
-
-                {/* Comments Preview */}
-                <TouchableOpacity>
-                  <Text style={styles.viewComments}>View all {post.comments} comments</Text>
+                  {/* Image Indicators */}
+                  {post.images.length > 1 && (
+                    <View style={styles.imageIndicators}>
+                      {post.images.map((_, idx) => (
+                        <View 
+                          key={idx}
+                          style={[styles.imageIndicator, currentImg === idx && styles.imageIndicatorActive]}
+                        />
+                      ))}
+                    </View>
+                  )}
                 </TouchableOpacity>
 
-                {/* Timestamp */}
-                <Text style={styles.timestamp}>{post.timestamp}</Text>
+                {/* Post Content */}
+                <View style={styles.postContent}>
+                  <Text style={styles.caption} numberOfLines={3}>{post.caption}</Text>
+                  
+                  {/* Tags */}
+                  {post.tags && (
+                    <View style={styles.tagsRow}>
+                      {post.tags.slice(0, 2).map((tag, idx) => (
+                        <Text key={idx} style={[styles.tag, { color: config.color }]}>{tag}</Text>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Promo Button */}
+                  {post.promo_link && (
+                    <TouchableOpacity style={[styles.promoButton, { backgroundColor: config.color }]}>
+                      <Text style={styles.promoButtonText}>{post.promo_link}</Text>
+                      <Ionicons name="arrow-forward" size={16} color="#fff" />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Action Row */}
+                  <View style={styles.actionRow}>
+                    <View style={styles.actionLeft}>
+                      <TouchableOpacity 
+                        style={styles.actionItem}
+                        onPress={() => toggleLike(post.id)}
+                      >
+                        <Ionicons 
+                          name={isLiked ? "heart" : "heart-outline"} 
+                          size={22} 
+                          color={isLiked ? "#EF4444" : "#6B7280"} 
+                        />
+                        <Text style={[styles.actionText, isLiked && { color: '#EF4444' }]}>
+                          {post.likes + (isLiked ? 1 : 0)}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.actionItem}>
+                        <Ionicons name="chatbubble-outline" size={20} color="#6B7280" />
+                        <Text style={styles.actionText}>{post.comments}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.actionItem}>
+                        <Ionicons name="share-outline" size={20} color="#6B7280" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.timestamp}>{post.timestamp}</Text>
+                  </View>
+                </View>
               </View>
             );
           })}
@@ -493,16 +427,21 @@ export default function ExploreScreen() {
                 <View style={styles.storyProgress}>
                   <View style={styles.storyProgressFill} />
                 </View>
-                <View style={styles.storyUserInfo}>
-                  <Image source={{ uri: selectedStory.user_image }} style={styles.storyUserAvatar} />
-                  <View>
-                    <Text style={styles.storyUsername}>{selectedStory.user_name}</Text>
-                    <Text style={styles.storyCategory}>{selectedStory.category}</Text>
+                <View style={styles.storyHeaderContent}>
+                  <View style={styles.storyUserInfo}>
+                    <Image source={{ uri: selectedStory.user_image }} style={styles.storyUserAvatar} />
+                    <View>
+                      <Text style={styles.storyUsername}>{selectedStory.user_name}</Text>
+                      <Text style={styles.storyUserCategory}>{selectedStory.category}</Text>
+                    </View>
                   </View>
+                  <TouchableOpacity 
+                    style={styles.storyCloseButton}
+                    onPress={() => setSelectedStory(null)}
+                  >
+                    <Ionicons name="close" size={24} color="#fff" />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => setSelectedStory(null)}>
-                  <Ionicons name="close" size={28} color="#fff" />
-                </TouchableOpacity>
               </View>
 
               {/* Story Text */}
@@ -512,13 +451,13 @@ export default function ExploreScreen() {
                 </View>
               )}
 
-              {/* Story Actions */}
-              <View style={[styles.storyActions, { paddingBottom: insets.bottom + 20 }]}>
-                <TouchableOpacity style={styles.storyActionButton}>
-                  <Ionicons name="heart-outline" size={28} color="#fff" />
+              {/* Story Footer */}
+              <View style={[styles.storyFooter, { paddingBottom: insets.bottom + 20 }]}>
+                <TouchableOpacity style={styles.storyActionBtn}>
+                  <Ionicons name="heart-outline" size={26} color="#fff" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.storyActionButton}>
-                  <Ionicons name="paper-plane-outline" size={26} color="#fff" />
+                <TouchableOpacity style={styles.storyActionBtn}>
+                  <Ionicons name="paper-plane-outline" size={24} color="#fff" />
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -526,15 +465,82 @@ export default function ExploreScreen() {
         )}
       </Modal>
 
-      {/* Floating Create Button */}
-      <TouchableOpacity style={[styles.fab, { bottom: 90 + insets.bottom }]}>
-        <LinearGradient
-          colors={['#10B981', '#059669']}
-          style={styles.fabGradient}
-        >
-          <Ionicons name="add" size={28} color="#fff" />
-        </LinearGradient>
-      </TouchableOpacity>
+      {/* Search Modal */}
+      <Modal visible={showSearch} animationType="slide">
+        <SafeAreaView style={styles.searchModal}>
+          {/* Search Header */}
+          <View style={styles.searchHeader}>
+            <TouchableOpacity onPress={() => setShowSearch(false)}>
+              <Ionicons name="arrow-back" size={24} color="#1F2937" />
+            </TouchableOpacity>
+            <View style={styles.searchInputContainer}>
+              <Ionicons name="search" size={18} color="#9CA3AF" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search creators, services..."
+                placeholderTextColor="#9CA3AF"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoFocus
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Category Filter (Only in Search) */}
+          <View style={styles.searchCategoryRow}>
+            {SEARCH_CATEGORIES.map((cat) => (
+              <TouchableOpacity
+                key={cat.id}
+                style={[styles.searchCategoryPill, searchCategory === cat.id && styles.searchCategoryPillActive]}
+                onPress={() => setSearchCategory(cat.id)}
+              >
+                <Text style={[styles.searchCategoryText, searchCategory === cat.id && styles.searchCategoryTextActive]}>
+                  {cat.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Search Results */}
+          <ScrollView style={styles.searchResults}>
+            {getFilteredSearchResults().map((post) => {
+              const config = CREATOR_CONFIG[post.creator_type];
+              return (
+                <TouchableOpacity key={post.id} style={styles.searchResultItem}>
+                  <Image source={{ uri: post.creator_image }} style={styles.searchResultAvatar} />
+                  <View style={styles.searchResultInfo}>
+                    <View style={styles.searchResultNameRow}>
+                      <Text style={styles.searchResultName}>{post.creator_name}</Text>
+                      {post.is_verified && (
+                        <Ionicons name="checkmark-circle" size={14} color="#3B82F6" />
+                      )}
+                    </View>
+                    <View style={styles.searchResultMeta}>
+                      <View style={[styles.searchResultBadge, { backgroundColor: config.bgColor }]}>
+                        <Text style={[styles.searchResultBadgeText, { color: config.color }]}>{config.label}</Text>
+                      </View>
+                      <Text style={styles.searchResultCategory}>{post.creator_category}</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
+                </TouchableOpacity>
+              );
+            })}
+            
+            {getFilteredSearchResults().length === 0 && searchQuery.length > 0 && (
+              <View style={styles.noResults}>
+                <Ionicons name="search" size={48} color="#D1D5DB" />
+                <Text style={styles.noResultsText}>No results found</Text>
+              </View>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -542,61 +548,65 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F9FAFB',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
     color: '#1F2937',
   },
-  headerActions: {
+  headerBadge: {
+    marginLeft: 8,
+    backgroundColor: '#D1FAE5',
+    padding: 4,
+    borderRadius: 8,
+  },
+  searchButton: {
     flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     gap: 8,
   },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  notifBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: '#EF4444',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notifBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#fff',
+  searchPlaceholder: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    flex: 1,
   },
   content: {
     flex: 1,
   },
   
+  // Section Labels
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    letterSpacing: 1,
+    marginBottom: 12,
+    paddingHorizontal: 16,
+  },
+  
   // Stories Section
   storiesSection: {
     backgroundColor: '#fff',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    paddingTop: 16,
+    paddingBottom: 16,
+    marginBottom: 8,
   },
   storiesContainer: {
     paddingHorizontal: 12,
@@ -604,224 +614,180 @@ const styles = StyleSheet.create({
   storyItem: {
     alignItems: 'center',
     marginHorizontal: 6,
-    width: 70,
-    position: 'relative',
-  },
-  addStoryWrapper: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    overflow: 'hidden',
-  },
-  addStoryGradient: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 72,
   },
   storyRing: {
     width: 68,
     height: 68,
     borderRadius: 34,
-    borderWidth: 3,
-    borderColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 3,
   },
-  storyRingLive: {
-    borderColor: '#EF4444',
+  storyAvatarWrapper: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
+    backgroundColor: '#fff',
+    padding: 2,
   },
   storyAvatar: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
   },
   liveBadge: {
     position: 'absolute',
-    bottom: -2,
+    top: 48,
     backgroundColor: '#EF4444',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   liveBadgeText: {
     fontSize: 8,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#fff',
   },
   storyName: {
     fontSize: 11,
-    color: '#4B5563',
-    marginTop: 4,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginTop: 6,
     textAlign: 'center',
   },
-  storyTypeBadge: {
-    position: 'absolute',
-    top: 0,
-    right: 2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  
-  // Category Filter
-  categorySection: {
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-  },
-  categoryContainer: {
-    paddingHorizontal: 12,
-  },
-  categoryPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 20,
-    marginRight: 8,
-    gap: 6,
-  },
-  categoryPillSelected: {
-    backgroundColor: '#10B981',
-  },
-  categoryText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  categoryTextSelected: {
-    color: '#fff',
+  storyCategory: {
+    fontSize: 9,
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
   
   // Feed Section
   feedSection: {
-    paddingTop: 8,
+    paddingTop: 16,
   },
   postCard: {
     backgroundColor: '#fff',
+    marginHorizontal: 16,
     marginBottom: 16,
-  },
-  postHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  postCreatorInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  creatorAvatarWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  creatorAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-  },
-  creatorDetails: {
-    marginLeft: 10,
-    flex: 1,
-  },
-  creatorNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  creatorName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  creatorMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-    gap: 4,
-  },
-  creatorTypeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    gap: 3,
-  },
-  creatorTypeText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  creatorCategory: {
-    fontSize: 11,
-    color: '#9CA3AF',
-  },
-  moreButton: {
-    padding: 4,
-  },
-  
-  // Milestone Banner
-  milestoneBanner: {
-    marginHorizontal: 12,
-    marginBottom: 8,
-    borderRadius: 10,
+    borderRadius: 20,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  milestoneGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    gap: 8,
-  },
-  milestoneText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  
-  // Post Image
   postImageContainer: {
     width: '100%',
-    height: SCREEN_WIDTH,
-    backgroundColor: '#F3F4F6',
+    height: 280,
     position: 'relative',
   },
   postImage: {
     width: '100%',
     height: '100%',
   },
-  imageNav: {
+  imageOverlay: {
     position: 'absolute',
-    top: '50%',
-    marginTop: -20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '60%',
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  creatorOverlay: {},
+  creatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  creatorAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  creatorInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  creatorNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  creatorName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  verifiedBadge: {
+    backgroundColor: '#3B82F6',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  imageNavLeft: {
-    left: 10,
+  creatorMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 8,
   },
-  imageNavRight: {
-    right: 10,
+  typeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 4,
+  },
+  typeBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  categoryText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    marginTop: 10,
+    gap: 16,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  milestoneBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 6,
+  },
+  milestoneText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#F59E0B',
   },
   imageIndicators: {
     position: 'absolute',
-    bottom: 12,
+    top: 12,
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -829,91 +795,40 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   imageIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    width: 24,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.4)',
   },
   imageIndicatorActive: {
     backgroundColor: '#fff',
-    width: 16,
-  },
-  imageCountBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  imageCountText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
   },
   
-  // Action Bar
-  actionBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  // Post Content
+  postContent: {
+    padding: 16,
   },
-  actionLeft: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  actionButton: {
-    padding: 4,
-  },
-  likesText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
-    paddingHorizontal: 16,
-  },
-  
-  // Caption
-  captionContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 6,
-  },
-  captionText: {
+  caption: {
     fontSize: 14,
     color: '#4B5563',
     lineHeight: 20,
   },
-  captionUsername: {
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  
-  // Tags
-  tagsContainer: {
+  tagsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    paddingTop: 6,
+    marginTop: 10,
     gap: 8,
   },
-  tagText: {
+  tag: {
     fontSize: 13,
-    color: '#3B82F6',
-    fontWeight: '500',
+    fontWeight: '600',
   },
-  
-  // Promo Button
   promoButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#10B981',
-    marginHorizontal: 16,
-    marginTop: 12,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 12,
+    marginTop: 12,
     gap: 6,
   },
   promoButtonText: {
@@ -921,20 +836,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
-  
-  // Comments
-  viewComments: {
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  actionLeft: {
+    flexDirection: 'row',
+    gap: 20,
+  },
+  actionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  actionText: {
     fontSize: 13,
-    color: '#9CA3AF',
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   timestamp: {
-    fontSize: 11,
-    color: '#D1D5DB',
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 12,
+    fontSize: 12,
+    color: '#9CA3AF',
   },
   
   // Story Modal
@@ -953,38 +880,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   storyProgress: {
-    height: 2,
+    height: 3,
     backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 1,
+    borderRadius: 2,
     marginBottom: 12,
   },
   storyProgressFill: {
     width: '50%',
     height: '100%',
     backgroundColor: '#fff',
-    borderRadius: 1,
+    borderRadius: 2,
+  },
+  storyHeaderContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   storyUserInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
     gap: 10,
   },
   storyUserAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: '#fff',
   },
   storyUsername: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: '#fff',
   },
-  storyCategory: {
+  storyUserCategory: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.8)',
+  },
+  storyCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   storyTextContainer: {
     position: 'absolute',
@@ -992,48 +931,142 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   storyText: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '800',
     color: '#fff',
     textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    textShadowRadius: 8,
   },
-  storyActions: {
+  storyFooter: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 20,
+    gap: 16,
   },
-  storyActionButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  storyActionBtn: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   
-  // FAB
-  fab: {
-    position: 'absolute',
-    right: 20,
-    borderRadius: 28,
-    overflow: 'hidden',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+  // Search Modal
+  searchModal: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
-  fabGradient: {
-    width: 56,
-    height: 56,
-    justifyContent: 'center',
+  searchHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#1F2937',
+  },
+  searchCategoryRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  searchCategoryPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+  },
+  searchCategoryPillActive: {
+    backgroundColor: '#10B981',
+  },
+  searchCategoryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  searchCategoryTextActive: {
+    color: '#fff',
+  },
+  searchResults: {
+    flex: 1,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  searchResultAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  searchResultInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  searchResultNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  searchResultName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  searchResultMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 8,
+  },
+  searchResultBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  searchResultBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  searchResultCategory: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  noResults: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  noResultsText: {
+    fontSize: 15,
+    color: '#9CA3AF',
+    marginTop: 12,
   },
   
   bottomPadding: {
