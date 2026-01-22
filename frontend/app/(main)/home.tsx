@@ -395,7 +395,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F8F9FA',
   },
   header: {
     flexDirection: 'row',
@@ -404,8 +404,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomWidth: 0,
   },
   headerLeft: {
     flex: 1,
@@ -422,7 +421,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#E8D9F4',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -433,11 +432,11 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#6B7280',
+    color: '#6C757D',
   },
   userName: {
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#212529',
   },
   locationRow: {
     flexDirection: 'row',
@@ -446,7 +445,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 12,
-    color: '#6366F1',
+    color: '#7C3AED',
     marginLeft: 4,
     marginRight: 2,
     maxWidth: 150,
