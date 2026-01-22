@@ -620,6 +620,200 @@ async def seed_data():
     
     return {"message": "Sample data seeded successfully"}
 
+@api_router.post("/seed/chats")
+async def seed_chat_data(current_user: User = Depends(require_auth)):
+    """Seed sample chat data for testing the chat UI"""
+    user_id = current_user.user_id
+    
+    # Create sample wishes first
+    sample_wishes = [
+        {
+            "wish_id": f"wish_demo_{uuid.uuid4().hex[:8]}",
+            "user_id": user_id,
+            "wish_type": "delivery",
+            "title": "Need groceries from local market",
+            "description": "Need rice, dal, and vegetables from the nearby market",
+            "location": {"lat": 12.9716, "lng": 77.5946, "address": "Sector 5, Block A"},
+            "radius_km": 5.0,
+            "remuneration": 150,
+            "is_immediate": True,
+            "scheduled_time": None,
+            "status": "accepted",
+            "accepted_by": "agent_rahul",
+            "created_at": datetime.now(timezone.utc) - timedelta(hours=2)
+        },
+        {
+            "wish_id": f"wish_demo_{uuid.uuid4().hex[:8]}",
+            "user_id": user_id,
+            "wish_type": "ride_request",
+            "title": "Need a ride to airport",
+            "description": "Flight at 6 PM, need to leave by 3 PM",
+            "location": {"lat": 12.9720, "lng": 77.5950, "address": "My Home, Tower B"},
+            "radius_km": 10.0,
+            "remuneration": 800,
+            "is_immediate": False,
+            "scheduled_time": datetime.now(timezone.utc) + timedelta(hours=5),
+            "status": "pending",
+            "accepted_by": None,
+            "created_at": datetime.now(timezone.utc) - timedelta(hours=1)
+        },
+        {
+            "wish_id": f"wish_demo_{uuid.uuid4().hex[:8]}",
+            "user_id": user_id,
+            "wish_type": "medicine_delivery",
+            "title": "Urgent medicine from Apollo Pharmacy",
+            "description": "Need Crocin and Vitamin C tablets",
+            "location": {"lat": 12.9718, "lng": 77.5948, "address": "Green Park, Flat 302"},
+            "radius_km": 3.0,
+            "remuneration": 100,
+            "is_immediate": True,
+            "scheduled_time": None,
+            "status": "in_progress",
+            "accepted_by": "agent_priya",
+            "created_at": datetime.now(timezone.utc) - timedelta(minutes=30)
+        },
+        {
+            "wish_id": f"wish_demo_{uuid.uuid4().hex[:8]}",
+            "user_id": user_id,
+            "wish_type": "home_maintenance",
+            "title": "Plumber needed for tap repair",
+            "description": "Kitchen tap is leaking, need immediate repair",
+            "location": {"lat": 12.9715, "lng": 77.5945, "address": "Sunrise Apartments, Unit 5"},
+            "radius_km": 5.0,
+            "remuneration": 300,
+            "is_immediate": True,
+            "scheduled_time": None,
+            "status": "completed",
+            "accepted_by": "agent_vikram",
+            "created_at": datetime.now(timezone.utc) - timedelta(days=1)
+        }
+    ]
+    
+    # Insert wishes
+    for wish in sample_wishes:
+        await db.wishes.update_one(
+            {"wish_id": wish["wish_id"]},
+            {"$set": wish},
+            upsert=True
+        )
+    
+    # Create sample agents (mock data)
+    agents = [
+        {"agent_id": "agent_rahul", "name": "Rahul Sharma", "rating": 4.8, "completed": 47},
+        {"agent_id": "agent_priya", "name": "Priya Menon", "rating": 4.9, "completed": 89},
+        {"agent_id": "agent_vikram", "name": "Vikram Patel", "rating": 4.7, "completed": 156},
+        {"agent_id": "agent_sneha", "name": "Sneha Reddy", "rating": 4.6, "completed": 32}
+    ]
+    
+    # Create chat rooms with messages
+    chat_data = [
+        {
+            "room": {
+                "room_id": f"room_demo_{uuid.uuid4().hex[:8]}",
+                "wish_id": sample_wishes[0]["wish_id"],
+                "wisher_id": user_id,
+                "agent_id": "agent_rahul",
+                "status": "active",
+                "created_at": datetime.now(timezone.utc) - timedelta(hours=2)
+            },
+            "messages": [
+                {"sender": "agent", "content": "Hi! I can help with your grocery shopping. I'm near the market now.", "time_offset": -110},
+                {"sender": "wisher", "content": "Great! I need rice (5kg), dal (1kg), and some vegetables", "time_offset": -105},
+                {"sender": "agent", "content": "Sure! Any specific brand preference for rice and dal?", "time_offset": -100},
+                {"sender": "wisher", "content": "India Gate basmati rice and Tata dal please", "time_offset": -95},
+                {"sender": "agent", "content": "Got it! I'll get fresh vegetables too. Budget around ₹500-600?", "time_offset": -90},
+                {"sender": "wisher", "content": "Yes that works. Please get tomatoes, onions, and potatoes", "time_offset": -85},
+                {"sender": "agent", "content": "Perfect! I'll be at the market in 10 minutes. Will send photos of the produce before buying.", "time_offset": -80},
+            ]
+        },
+        {
+            "room": {
+                "room_id": f"room_demo_{uuid.uuid4().hex[:8]}",
+                "wish_id": sample_wishes[1]["wish_id"],
+                "wisher_id": user_id,
+                "agent_id": "agent_sneha",
+                "status": "active",
+                "created_at": datetime.now(timezone.utc) - timedelta(hours=1)
+            },
+            "messages": [
+                {"sender": "agent", "content": "Hello! I saw your airport ride request. I have a comfortable sedan.", "time_offset": -55},
+                {"sender": "wisher", "content": "Hi! What car do you have?", "time_offset": -50},
+                {"sender": "agent", "content": "It's a Honda City. AC, clean and well maintained. 4.9 rating for rides!", "time_offset": -45},
+                {"sender": "wisher", "content": "Sounds good. Can you confirm pickup at 3 PM?", "time_offset": -40},
+                {"sender": "agent", "content": "Yes confirmed! I'll be there 10 minutes early. Can you share your exact location?", "time_offset": -35},
+                {"sender": "wisher", "content": "Tower B, Gate 2. I'll wait near the security booth.", "time_offset": -30},
+                {"sender": "agent", "content": "Perfect! See you tomorrow at 2:50 PM. Have a safe flight! ✈️", "time_offset": -25},
+            ]
+        },
+        {
+            "room": {
+                "room_id": f"room_demo_{uuid.uuid4().hex[:8]}",
+                "wish_id": sample_wishes[2]["wish_id"],
+                "wisher_id": user_id,
+                "agent_id": "agent_priya",
+                "status": "approved",
+                "created_at": datetime.now(timezone.utc) - timedelta(minutes=30)
+            },
+            "messages": [
+                {"sender": "agent", "content": "Hi! I'm near Apollo Pharmacy. Which medicines do you need?", "time_offset": -28},
+                {"sender": "wisher", "content": "Crocin tablets and Vitamin C. The 500mg ones.", "time_offset": -26},
+                {"sender": "agent", "content": "Got it! Do you have a prescription or are these OTC?", "time_offset": -24},
+                {"sender": "wisher", "content": "OTC. No prescription needed for these.", "time_offset": -22},
+                {"sender": "agent", "content": "Perfect! I'm picking them up now. Total is ₹185. Will be there in 15 mins.", "time_offset": -20},
+                {"sender": "wisher", "content": "Thank you so much! 🙏", "time_offset": -18},
+                {"sender": "agent", "content": "On my way now! ETA 10 minutes. 🏃‍♀️", "time_offset": -15},
+            ]
+        },
+        {
+            "room": {
+                "room_id": f"room_demo_{uuid.uuid4().hex[:8]}",
+                "wish_id": sample_wishes[3]["wish_id"],
+                "wisher_id": user_id,
+                "agent_id": "agent_vikram",
+                "status": "completed",
+                "created_at": datetime.now(timezone.utc) - timedelta(days=1)
+            },
+            "messages": [
+                {"sender": "agent", "content": "Hello! I'm a certified plumber. I can fix your tap today.", "time_offset": -1440},
+                {"sender": "wisher", "content": "Great! When can you come?", "time_offset": -1435},
+                {"sender": "agent", "content": "I can be there in 30 minutes. Is that okay?", "time_offset": -1430},
+                {"sender": "wisher", "content": "Yes please! The leak is getting worse.", "time_offset": -1425},
+                {"sender": "agent", "content": "On my way! I'll bring all necessary tools.", "time_offset": -1420},
+                {"sender": "agent", "content": "Reached! I'm at your gate.", "time_offset": -1390},
+                {"sender": "wisher", "content": "Coming down to let you in!", "time_offset": -1388},
+                {"sender": "agent", "content": "Tap fixed! It was a worn out washer. All good now! 👍", "time_offset": -1350},
+                {"sender": "wisher", "content": "Thank you so much! Great work! ⭐⭐⭐⭐⭐", "time_offset": -1345},
+            ]
+        }
+    ]
+    
+    # Insert chat rooms and messages
+    for chat in chat_data:
+        room = chat["room"]
+        await db.chat_rooms.update_one(
+            {"room_id": room["room_id"]},
+            {"$set": room},
+            upsert=True
+        )
+        
+        for idx, msg in enumerate(chat["messages"]):
+            message = {
+                "message_id": f"msg_demo_{uuid.uuid4().hex[:8]}",
+                "room_id": room["room_id"],
+                "sender_id": room["agent_id"] if msg["sender"] == "agent" else user_id,
+                "sender_type": msg["sender"] if msg["sender"] == "agent" else "wisher",
+                "content": msg["content"],
+                "created_at": datetime.now(timezone.utc) + timedelta(minutes=msg["time_offset"])
+            }
+            await db.messages.insert_one(message)
+    
+    return {
+        "message": "Chat data seeded successfully!",
+        "wishes_created": len(sample_wishes),
+        "chat_rooms_created": len(chat_data),
+        "total_messages": sum(len(c["messages"]) for c in chat_data)
+    }
+
 # ===================== HEALTH CHECK =====================
 
 @api_router.get("/")
