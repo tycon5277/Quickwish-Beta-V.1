@@ -344,8 +344,8 @@ export default function AccountScreen() {
               style={styles.quickActionCard}
               onPress={() => router.push('/orders')}
             >
-              <View style={[styles.quickActionIcon, { backgroundColor: '#D1FAE5' }]}>
-                <Ionicons name="receipt" size={24} color="#10B981" />
+              <View style={[styles.quickActionIcon, { backgroundColor: '#E8D9F4' }]}>
+                <Ionicons name="receipt" size={24} color="#7C3AED" />
               </View>
               <Text style={styles.quickActionLabel}>My Orders</Text>
             </TouchableOpacity>
@@ -353,8 +353,8 @@ export default function AccountScreen() {
               style={styles.quickActionCard}
               onPress={() => router.push('/account/addresses')}
             >
-              <View style={[styles.quickActionIcon, { backgroundColor: '#DBEAFE' }]}>
-                <Ionicons name="location" size={24} color="#3B82F6" />
+              <View style={[styles.quickActionIcon, { backgroundColor: '#D0E9F7' }]}>
+                <Ionicons name="location" size={24} color="#0EA5E9" />
               </View>
               <Text style={styles.quickActionLabel}>Addresses</Text>
             </TouchableOpacity>
@@ -362,7 +362,7 @@ export default function AccountScreen() {
               style={styles.quickActionCard}
               onPress={() => handleMenuPress('/account/payments', 'Payment Methods')}
             >
-              <View style={[styles.quickActionIcon, { backgroundColor: '#FEF3C7' }]}>
+              <View style={[styles.quickActionIcon, { backgroundColor: '#FCE9C6' }]}>
                 <Ionicons name="card" size={24} color="#F59E0B" />
               </View>
               <Text style={styles.quickActionLabel}>Payments</Text>
@@ -371,8 +371,8 @@ export default function AccountScreen() {
               style={styles.quickActionCard}
               onPress={() => handleMenuPress('/account/support', 'Help & Support')}
             >
-              <View style={[styles.quickActionIcon, { backgroundColor: '#EDE9FE' }]}>
-                <Ionicons name="help-circle" size={24} color="#8B5CF6" />
+              <View style={[styles.quickActionIcon, { backgroundColor: '#E8D9F4' }]}>
+                <Ionicons name="help-circle" size={24} color="#7C3AED" />
               </View>
               <Text style={styles.quickActionLabel}>Help</Text>
             </TouchableOpacity>
@@ -387,8 +387,8 @@ export default function AccountScreen() {
               style={styles.menuItem}
               onPress={() => router.push('/account/profile')}
             >
-              <View style={[styles.menuIcon, { backgroundColor: '#D1FAE5' }]}>
-                <Ionicons name="person" size={20} color="#10B981" />
+              <View style={[styles.menuIcon, { backgroundColor: '#E8D9F4' }]}>
+                <Ionicons name="person" size={20} color="#7C3AED" />
               </View>
               <Text style={styles.menuLabel}>Edit Profile</Text>
               <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
@@ -397,8 +397,8 @@ export default function AccountScreen() {
               style={styles.menuItem}
               onPress={() => handleMenuPress('/account/notifications', 'Notifications')}
             >
-              <View style={[styles.menuIcon, { backgroundColor: '#DBEAFE' }]}>
-                <Ionicons name="notifications" size={20} color="#3B82F6" />
+              <View style={[styles.menuIcon, { backgroundColor: '#D0E9F7' }]}>
+                <Ionicons name="notifications" size={20} color="#0EA5E9" />
               </View>
               <Text style={styles.menuLabel}>Notifications</Text>
               <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
@@ -407,7 +407,7 @@ export default function AccountScreen() {
               style={styles.menuItem}
               onPress={() => handleMenuPress('/account/about', 'About QuickWish')}
             >
-              <View style={[styles.menuIcon, { backgroundColor: '#FEF3C7' }]}>
+              <View style={[styles.menuIcon, { backgroundColor: '#FCE9C6' }]}>
                 <Ionicons name="information-circle" size={20} color="#F59E0B" />
               </View>
               <Text style={styles.menuLabel}>About QuickWish</Text>
