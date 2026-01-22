@@ -44,12 +44,12 @@ const WISH_TYPES = [
     desc: 'Auto, taxi, transport',
     example: 'Need an auto to railway station',
     subCategories: [
-      { id: 'auto', label: 'Auto Rickshaw', icon: 'car-sport' },
+      { id: 'auto', label: 'Auto Rickshaw', icon: 'trail-sign' },
       { id: 'taxi_car', label: 'Taxi Car', icon: 'car' },
       { id: 'mini_bus', label: 'Mini Bus', icon: 'bus' },
-      { id: 'goods_small', label: 'Goods Carrier (Small)', icon: 'cube' },
-      { id: 'goods_medium', label: 'Goods Carrier (Medium)', icon: 'cube-outline' },
-      { id: 'goods_large', label: 'Goods Carrier (Large)', icon: 'car' }
+      { id: 'goods_small', label: 'Small Carrier', icon: 'cube' },
+      { id: 'goods_medium', label: 'Medium Carrier', icon: 'git-merge' },
+      { id: 'goods_large', label: 'Large Carrier', icon: 'train' }
     ]
   },
   { 
