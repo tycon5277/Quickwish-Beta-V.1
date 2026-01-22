@@ -20,7 +20,7 @@ export default function MainLayout() {
   const bottomPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 10 : 0);
 
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <View style={styles.container}>
       <Tabs
         screenOptions={{
           headerShown: false,
