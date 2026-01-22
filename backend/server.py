@@ -573,6 +573,294 @@ async def get_business_categories():
     categories = await db.local_businesses.distinct("category")
     return categories
 
+# ===================== HUB VENDOR SHOP ENDPOINTS =====================
+
+@api_router.get("/localhub/vendors")
+async def get_hub_vendors(
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+    radius_km: float = 5.0,
+    category: Optional[str] = None
+):
+    """Get hub vendors with radius filtering (max 10km)"""
+    radius_km = min(radius_km, 10.0)  # Max 10km
+    
+    query = {}
+    if category:
+        query["category"] = category
+    
+    vendors = await db.hub_vendors.find(query, {"_id": 0}).to_list(100)
+    
+    # If location provided, filter by distance
+    if lat and lng:
+        from math import radians, sin, cos, sqrt, atan2
+        
+        def haversine(lat1, lng1, lat2, lng2):
+            R = 6371  # Earth's radius in km
+            dlat = radians(lat2 - lat1)
+            dlng = radians(lng2 - lng1)
+            a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng/2)**2
+            c = 2 * atan2(sqrt(a), sqrt(1-a))
+            return R * c
+        
+        filtered = []
+        for vendor in vendors:
+            if "location" in vendor:
+                distance = haversine(lat, lng, vendor["location"]["lat"], vendor["location"]["lng"])
+                if distance <= radius_km:
+                    vendor["distance_km"] = round(distance, 2)
+                    filtered.append(vendor)
+        
+        # Sort by distance
+        vendors = sorted(filtered, key=lambda x: x.get("distance_km", 999))
+    
+    return vendors
+
+@api_router.get("/localhub/vendors/{vendor_id}")
+async def get_vendor_details(vendor_id: str):
+    """Get detailed vendor information"""
+    vendor = await db.hub_vendors.find_one({"vendor_id": vendor_id}, {"_id": 0})
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    return vendor
+
+@api_router.get("/localhub/vendors/{vendor_id}/products")
+async def get_vendor_products(vendor_id: str, category: Optional[str] = None):
+    """Get all products for a vendor"""
+    query = {"vendor_id": vendor_id, "is_available": True}
+    if category:
+        query["category"] = category
+    
+    products = await db.products.find(query, {"_id": 0}).to_list(100)
+    return products
+
+@api_router.get("/localhub/products/{product_id}")
+async def get_product_details(product_id: str):
+    """Get detailed product information"""
+    product = await db.products.find_one({"product_id": product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product
+
+@api_router.post("/localhub/products/{product_id}/like")
+async def like_product(product_id: str, current_user: User = Depends(require_auth)):
+    """Like a product"""
+    result = await db.products.update_one(
+        {"product_id": product_id},
+        {"$inc": {"likes": 1}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return {"message": "Product liked"}
+
+# ===================== CART ENDPOINTS =====================
+
+@api_router.get("/cart")
+async def get_cart(current_user: User = Depends(require_auth)):
+    """Get user's cart"""
+    cart = await db.carts.find_one({"user_id": current_user.user_id}, {"_id": 0})
+    if not cart:
+        return {"user_id": current_user.user_id, "items": [], "vendor_id": None}
+    
+    # Enrich with product details
+    enriched_items = []
+    for item in cart.get("items", []):
+        product = await db.products.find_one({"product_id": item["product_id"]}, {"_id": 0})
+        if product:
+            enriched_items.append({
+                **item,
+                "product": product
+            })
+    
+    cart["items"] = enriched_items
+    return cart
+
+@api_router.post("/cart/add")
+async def add_to_cart(item: CartItem, current_user: User = Depends(require_auth)):
+    """Add item to cart"""
+    # Get product info
+    product = await db.products.find_one({"product_id": item.product_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    # Get or create cart
+    cart = await db.carts.find_one({"user_id": current_user.user_id})
+    
+    if not cart:
+        # Create new cart
+        cart = {
+            "user_id": current_user.user_id,
+            "vendor_id": product["vendor_id"],
+            "items": [{"product_id": item.product_id, "quantity": item.quantity}]
+        }
+        await db.carts.insert_one(cart)
+    else:
+        # Check if same vendor
+        if cart.get("vendor_id") and cart["vendor_id"] != product["vendor_id"]:
+            raise HTTPException(
+                status_code=400, 
+                detail="Cannot add items from different vendors. Please clear cart first."
+            )
+        
+        # Check if product already in cart
+        existing_item = next((i for i in cart.get("items", []) if i["product_id"] == item.product_id), None)
+        
+        if existing_item:
+            # Update quantity
+            await db.carts.update_one(
+                {"user_id": current_user.user_id, "items.product_id": item.product_id},
+                {"$inc": {"items.$.quantity": item.quantity}}
+            )
+        else:
+            # Add new item
+            await db.carts.update_one(
+                {"user_id": current_user.user_id},
+                {
+                    "$push": {"items": {"product_id": item.product_id, "quantity": item.quantity}},
+                    "$set": {"vendor_id": product["vendor_id"]}
+                }
+            )
+    
+    return {"message": "Item added to cart"}
+
+@api_router.put("/cart/update")
+async def update_cart_item(item: CartUpdate, current_user: User = Depends(require_auth)):
+    """Update cart item quantity"""
+    if item.quantity <= 0:
+        # Remove item
+        await db.carts.update_one(
+            {"user_id": current_user.user_id},
+            {"$pull": {"items": {"product_id": item.product_id}}}
+        )
+    else:
+        await db.carts.update_one(
+            {"user_id": current_user.user_id, "items.product_id": item.product_id},
+            {"$set": {"items.$.quantity": item.quantity}}
+        )
+    return {"message": "Cart updated"}
+
+@api_router.delete("/cart/clear")
+async def clear_cart(current_user: User = Depends(require_auth)):
+    """Clear entire cart"""
+    await db.carts.delete_one({"user_id": current_user.user_id})
+    return {"message": "Cart cleared"}
+
+# ===================== SHOP ORDER ENDPOINTS =====================
+
+class OrderCreate(BaseModel):
+    delivery_address: dict
+    delivery_type: str  # "shop_delivery" or "agent_delivery"
+    notes: Optional[str] = None
+
+@api_router.post("/orders")
+async def create_order(order_data: OrderCreate, current_user: User = Depends(require_auth)):
+    """Create an order from cart"""
+    # Get cart
+    cart = await db.carts.find_one({"user_id": current_user.user_id})
+    if not cart or not cart.get("items"):
+        raise HTTPException(status_code=400, detail="Cart is empty")
+    
+    # Get vendor
+    vendor = await db.hub_vendors.find_one({"vendor_id": cart["vendor_id"]}, {"_id": 0})
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+    
+    # Build order items with product details
+    items = []
+    total_amount = 0
+    
+    for cart_item in cart["items"]:
+        product = await db.products.find_one({"product_id": cart_item["product_id"]}, {"_id": 0})
+        if product:
+            price = product.get("discounted_price") or product["price"]
+            item_total = price * cart_item["quantity"]
+            items.append({
+                "product_id": product["product_id"],
+                "name": product["name"],
+                "price": price,
+                "quantity": cart_item["quantity"],
+                "total": item_total
+            })
+            total_amount += item_total
+    
+    # Calculate delivery fee
+    delivery_fee = 0
+    if order_data.delivery_type == "agent_delivery":
+        delivery_fee = 30  # Base delivery fee
+    elif order_data.delivery_type == "shop_delivery" and not vendor.get("has_own_delivery"):
+        raise HTTPException(status_code=400, detail="This vendor doesn't offer delivery")
+    
+    # Create order
+    order = {
+        "order_id": f"order_{uuid.uuid4().hex[:12]}",
+        "user_id": current_user.user_id,
+        "vendor_id": cart["vendor_id"],
+        "vendor_name": vendor["name"],
+        "items": items,
+        "total_amount": total_amount,
+        "delivery_fee": delivery_fee,
+        "grand_total": total_amount + delivery_fee,
+        "delivery_address": order_data.delivery_address,
+        "delivery_type": order_data.delivery_type,
+        "assigned_agent_id": None,
+        "status": "pending",
+        "payment_status": "pending",
+        "notes": order_data.notes,
+        "created_at": datetime.now(timezone.utc)
+    }
+    
+    await db.shop_orders.insert_one(order)
+    
+    # If agent delivery, create a delivery wish
+    if order_data.delivery_type == "agent_delivery":
+        delivery_wish = {
+            "wish_id": f"wish_{uuid.uuid4().hex[:12]}",
+            "user_id": current_user.user_id,
+            "wish_type": "delivery",
+            "title": f"Delivery from {vendor['name']}",
+            "description": f"Pick up order #{order['order_id'][-8:]} from {vendor['name']} and deliver to customer",
+            "location": vendor.get("location", {}),
+            "destination": order_data.delivery_address,
+            "radius_km": 5.0,
+            "remuneration": delivery_fee,
+            "is_immediate": True,
+            "scheduled_time": None,
+            "status": "pending",
+            "linked_order_id": order["order_id"],
+            "accepted_by": None,
+            "created_at": datetime.now(timezone.utc)
+        }
+        await db.wishes.insert_one(delivery_wish)
+    
+    # Clear cart
+    await db.carts.delete_one({"user_id": current_user.user_id})
+    
+    return {
+        "message": "Order placed successfully",
+        "order_id": order["order_id"],
+        "grand_total": order["grand_total"]
+    }
+
+@api_router.get("/orders")
+async def get_orders(current_user: User = Depends(require_auth)):
+    """Get user's orders"""
+    orders = await db.shop_orders.find(
+        {"user_id": current_user.user_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return orders
+
+@api_router.get("/orders/{order_id}")
+async def get_order_details(order_id: str, current_user: User = Depends(require_auth)):
+    """Get order details"""
+    order = await db.shop_orders.find_one(
+        {"order_id": order_id, "user_id": current_user.user_id},
+        {"_id": 0}
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return order
+
 # ===================== SEED DATA =====================
 
 @api_router.post("/seed")
