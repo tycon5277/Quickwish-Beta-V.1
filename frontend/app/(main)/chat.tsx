@@ -271,6 +271,12 @@ export default function ChatScreen() {
                 : 'When a fulfillment agent accepts your wish, you can chat with them here'
               }
             </Text>
+            {!searchQuery && (
+              <TouchableOpacity style={styles.seedButton} onPress={seedChatData}>
+                <Ionicons name="sparkles" size={18} color="#fff" />
+                <Text style={styles.seedButtonText}>Load Demo Chats</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           filteredRooms.map((room) => {
