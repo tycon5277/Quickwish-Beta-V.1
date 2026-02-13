@@ -3,47 +3,10 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIn
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import axios from 'axios';
-import Constants from 'expo-constants';
 import { useAuth } from '../_layout';
-
-const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
-                   process.env.EXPO_PUBLIC_BACKEND_URL || 
-                   'https://order-lifecycle-8.preview.emergentagent.com';
+import { wisherAPI, STATUS_COLORS, Order } from '../../utils/api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-interface Order {
-  order_id: string;
-  vendor_name: string;
-  vendor_image?: string;
-  items: Array<{ name: string; quantity: number; price: number; total: number; image?: string }>;
-  subtotal: number;
-  tax_amount: number;
-  delivery_fee: number;
-  grand_total: number;
-  status: string;
-  delivery_type: string;
-  delivery_address: { address: string };
-  created_at: string;
-  estimated_delivery?: string;
-  agent_name?: string;
-  agent_phone?: string;
-}
-
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string; bgColor: string }> = {
-  confirmed: { label: 'Confirmed', color: '#3B82F6', icon: 'checkmark-circle', bgColor: '#EFF6FF' },
-  preparing: { label: 'Preparing', color: '#F59E0B', icon: 'flame', bgColor: '#FEF3C7' },
-  ready: { label: 'Ready for Pickup', color: '#8B5CF6', icon: 'cube', bgColor: '#EDE9FE' },
-  picked_up: { label: 'Picked Up', color: '#06B6D4', icon: 'bicycle', bgColor: '#CFFAFE' },
-  on_the_way: { label: 'On The Way', color: '#10B981', icon: 'navigate', bgColor: '#D1FAE5' },
-  nearby: { label: 'Nearby', color: '#10B981', icon: 'location', bgColor: '#D1FAE5' },
-  delivered: { label: 'Delivered', color: '#6B7280', icon: 'checkmark-done-circle', bgColor: '#F3F4F6' },
-  cancelled: { label: 'Cancelled', color: '#EF4444', icon: 'close-circle', bgColor: '#FEE2E2' },
-};
-
-const STATUS_STEPS = ['confirmed', 'preparing', 'ready', 'picked_up', 'on_the_way', 'delivered'];
 
 export default function OrdersScreen() {
   const router = useRouter();
@@ -52,16 +15,21 @@ export default function OrdersScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'active' | 'past'>('active');
+  const [error, setError] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
-    if (!sessionToken) return;
+    if (!sessionToken) {
+      setIsLoading(false);
+      return;
+    }
+    
     try {
-      const response = await axios.get(`${BACKEND_URL}/api/orders`, {
-        headers: { Authorization: `Bearer ${sessionToken}` }
-      });
-      setOrders(response.data);
-    } catch (error) {
-      console.error('Error fetching orders:', error);
+      setError(null);
+      const response = await wisherAPI.getOrders(sessionToken);
+      setOrders(response.orders || []);
+    } catch (err: any) {
+      console.error('Error fetching orders:', err);
+      setError(err.response?.data?.detail || 'Failed to load orders');
     } finally {
       setIsLoading(false);
     }
@@ -80,6 +48,7 @@ export default function OrdersScreen() {
     setRefreshing(false);
   };
 
+  // Filter orders by active/past status
   const activeOrders = orders.filter(o => !['delivered', 'cancelled'].includes(o.status));
   const pastOrders = orders.filter(o => ['delivered', 'cancelled'].includes(o.status));
   const displayedOrders = selectedTab === 'active' ? activeOrders : pastOrders;
@@ -94,7 +63,9 @@ export default function OrdersScreen() {
     });
   };
 
-  const getStatusIndex = (status: string) => STATUS_STEPS.indexOf(status);
+  const getStatusConfig = (status: string) => {
+    return STATUS_COLORS[status] || STATUS_COLORS.placed;
+  };
 
   if (isLoading) {
     return (
@@ -102,6 +73,27 @@ export default function OrdersScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#10B981" />
           <Text style={styles.loadingText}>Loading orders...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!sessionToken) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>My Orders</Text>
+          <View style={styles.headerRight} />
+        </View>
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="person-outline" size={48} color="#10B981" />
+          </View>
+          <Text style={styles.emptyTitle}>Please Login</Text>
+          <Text style={styles.emptySubtext}>Login to view your orders</Text>
         </View>
       </SafeAreaView>
     );
@@ -138,6 +130,13 @@ export default function OrdersScreen() {
         </TouchableOpacity>
       </View>
 
+      {error && (
+        <View style={styles.errorBanner}>
+          <Ionicons name="alert-circle" size={18} color="#EF4444" />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -161,7 +160,7 @@ export default function OrdersScreen() {
             {selectedTab === 'active' && (
               <TouchableOpacity 
                 style={styles.shopNowButton}
-                onPress={() => router.back()}
+                onPress={() => router.push('/(main)/localhub')}
               >
                 <Text style={styles.shopNowText}>Shop Now</Text>
               </TouchableOpacity>
@@ -169,8 +168,7 @@ export default function OrdersScreen() {
           </View>
         ) : (
           displayedOrders.map((order) => {
-            const statusConfig = STATUS_CONFIG[order.status] || STATUS_CONFIG.confirmed;
-            const statusIndex = getStatusIndex(order.status);
+            const statusConfig = getStatusConfig(order.status);
             
             return (
               <TouchableOpacity 
@@ -182,15 +180,11 @@ export default function OrdersScreen() {
                 {/* Order Header */}
                 <View style={styles.orderHeader}>
                   <View style={styles.orderShopInfo}>
-                    {order.vendor_image ? (
-                      <Image source={{ uri: order.vendor_image }} style={styles.shopImage} />
-                    ) : (
-                      <View style={styles.shopImagePlaceholder}>
-                        <Ionicons name="storefront" size={20} color="#9CA3AF" />
-                      </View>
-                    )}
+                    <View style={styles.shopImagePlaceholder}>
+                      <Ionicons name="storefront" size={20} color="#9CA3AF" />
+                    </View>
                     <View style={styles.shopDetails}>
-                      <Text style={styles.shopName}>{order.vendor_name}</Text>
+                      <Text style={styles.shopName}>{order.vendor_name || 'Shop'}</Text>
                       <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
                     </View>
                   </View>
@@ -202,60 +196,26 @@ export default function OrdersScreen() {
                   </View>
                 </View>
 
-                {/* Progress Bar for Active Orders */}
-                {selectedTab === 'active' && statusIndex >= 0 && (
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressBar}>
-                      {STATUS_STEPS.map((step, idx) => {
-                        const isCompleted = idx <= statusIndex;
-                        const isCurrent = idx === statusIndex;
-                        return (
-                          <React.Fragment key={step}>
-                            <View style={[
-                              styles.progressDot,
-                              isCompleted && styles.progressDotCompleted,
-                              isCurrent && styles.progressDotCurrent
-                            ]}>
-                              {isCurrent && (
-                                <View style={styles.progressDotInner} />
-                              )}
-                            </View>
-                            {idx < STATUS_STEPS.length - 1 && (
-                              <View style={[
-                                styles.progressLine,
-                                isCompleted && styles.progressLineCompleted
-                              ]} />
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </View>
-                    <View style={styles.progressLabels}>
-                      <Text style={styles.progressLabel}>Confirmed</Text>
-                      <Text style={styles.progressLabel}>On Way</Text>
-                      <Text style={styles.progressLabel}>Delivered</Text>
-                    </View>
+                {/* Order Items Preview */}
+                {order.items && order.items.length > 0 && (
+                  <View style={styles.orderItems}>
+                    {order.items.slice(0, 2).map((item, idx) => (
+                      <View key={idx} style={styles.orderItem}>
+                        <Text style={styles.orderItemQty}>{item.quantity}x</Text>
+                        <Text style={styles.orderItemName} numberOfLines={1}>{item.name}</Text>
+                      </View>
+                    ))}
+                    {order.items.length > 2 && (
+                      <Text style={styles.moreItems}>+{order.items.length - 2} more items</Text>
+                    )}
                   </View>
                 )}
-
-                {/* Order Items Preview */}
-                <View style={styles.orderItems}>
-                  {order.items.slice(0, 2).map((item, idx) => (
-                    <View key={idx} style={styles.orderItem}>
-                      <Text style={styles.orderItemQty}>{item.quantity}x</Text>
-                      <Text style={styles.orderItemName} numberOfLines={1}>{item.name}</Text>
-                    </View>
-                  ))}
-                  {order.items.length > 2 && (
-                    <Text style={styles.moreItems}>+{order.items.length - 2} more items</Text>
-                  )}
-                </View>
 
                 {/* Order Footer */}
                 <View style={styles.orderFooter}>
                   <View style={styles.orderTotal}>
                     <Text style={styles.totalLabel}>Total</Text>
-                    <Text style={styles.totalAmount}>₹{order.grand_total}</Text>
+                    <Text style={styles.totalAmount}>₹{order.total_amount}</Text>
                   </View>
                   <View style={styles.viewDetails}>
                     <Text style={styles.viewDetailsText}>View Details</Text>
@@ -263,17 +223,8 @@ export default function OrdersScreen() {
                   </View>
                 </View>
 
-                {/* Delivery Type Badge */}
-                <View style={styles.deliveryTypeBadge}>
-                  <Ionicons 
-                    name={order.delivery_type === 'agent_delivery' ? 'people' : 'bicycle'} 
-                    size={12} 
-                    color="#6B7280" 
-                  />
-                  <Text style={styles.deliveryTypeText}>
-                    {order.delivery_type === 'agent_delivery' ? 'Agent Delivery' : 'Shop Delivery'}
-                  </Text>
-                </View>
+                {/* Order ID */}
+                <Text style={styles.orderId}>#{order.order_id.slice(-8)}</Text>
               </TouchableOpacity>
             );
           })
@@ -327,6 +278,22 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: '#fff',
+  },
+
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    gap: 8,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#EF4444',
+    flex: 1,
   },
 
   content: { flex: 1 },
@@ -392,11 +359,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  shopImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-  },
   shopImagePlaceholder: {
     width: 44,
     height: 44,
@@ -430,57 +392,6 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-
-  progressContainer: {
-    marginBottom: 14,
-    paddingTop: 4,
-  },
-  progressBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-  },
-  progressDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#E5E7EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressDotCompleted: {
-    backgroundColor: '#10B981',
-  },
-  progressDotCurrent: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#10B981',
-  },
-  progressDotInner: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#fff',
-  },
-  progressLine: {
-    flex: 1,
-    height: 3,
-    backgroundColor: '#E5E7EB',
-  },
-  progressLineCompleted: {
-    backgroundColor: '#10B981',
-  },
-  progressLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-    marginTop: 6,
-  },
-  progressLabel: {
-    fontSize: 10,
-    color: '#9CA3AF',
   },
 
   orderItems: {
@@ -545,18 +456,13 @@ const styles = StyleSheet.create({
     color: '#10B981',
   },
 
-  deliveryTypeBadge: {
+  orderId: {
     position: 'absolute',
     top: 16,
     right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    opacity: 0,
-  },
-  deliveryTypeText: {
-    fontSize: 11,
-    color: '#6B7280',
+    fontSize: 10,
+    color: '#9CA3AF',
+    fontFamily: 'monospace',
   },
 
   bottomPadding: { height: 40 },
