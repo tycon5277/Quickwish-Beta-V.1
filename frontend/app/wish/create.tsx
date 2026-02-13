@@ -14,7 +14,7 @@ import { useAppStore } from '../../src/store';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
-                   'https://wishmarket-1.preview.emergentagent.com';
+                   'https://order-lifecycle-8.preview.emergentagent.com';
 
 // Primary wish categories with examples and sub-categories
 const WISH_TYPES = [

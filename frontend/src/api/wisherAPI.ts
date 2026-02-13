@@ -1,9 +1,9 @@
 // Wisher API utility for Order Lifecycle integration
-// Backend URL: https://order-lifecycle-7.preview.emergentagent.com
+// Backend URL: https://order-lifecycle-8.preview.emergentagent.com
 
 import axios from 'axios';
 
-const ORDER_BACKEND_URL = 'https://order-lifecycle-7.preview.emergentagent.com';
+const ORDER_BACKEND_URL = 'https://order-lifecycle-8.preview.emergentagent.com';
 
 // Create axios instance for order lifecycle APIs
 const orderAPI = axios.create({
