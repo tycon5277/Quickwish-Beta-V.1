@@ -366,24 +366,69 @@ export default function ShopScreen() {
     try {
       console.log('Placing order with:', { vendorId, deliveryAddress, deliveryType });
       
-      const response = await axios.post(`${BACKEND_URL}/api/orders`,
-        {
-          vendor_id: vendorId,
-          delivery_address: { 
-            address: deliveryAddress,
-            label: selectedAddressId ? userAddresses.find(a => a.id === selectedAddressId)?.label : 'Delivery'
-          },
-          delivery_type: deliveryType,
+      // Build order items from cart
+      const orderItems = cart.map(item => {
+        const product = products.find(p => p.product_id === item.product_id);
+        return {
+          product_id: item.product_id,
+          name: product?.name || 'Unknown Item',
+          quantity: item.quantity,
+          price: product?.discounted_price || product?.price || 0,
+        };
+      });
+
+      // Calculate totals for local display
+      const subtotal = getCartTotal();
+      const taxAmount = Math.round(subtotal * 0.05);
+      const deliveryFee = deliveryType === 'agent_delivery' ? 30 : 0;
+      const grandTotal = subtotal + taxAmount + deliveryFee;
+
+      // Prepare order data for the new external API
+      const orderData: CreateOrderData = {
+        vendor_id: vendorId,
+        items: orderItems,
+        delivery_address: { 
+          address: deliveryAddress,
+          lat: 0, // Optional - can be filled if GPS was used
+          lng: 0,
         },
-        { headers: { Authorization: `Bearer ${sessionToken}` } }
-      );
+        delivery_type: deliveryType,
+        special_instructions: '',
+      };
       
-      console.log('Order response:', response.data);
+      // Call the new external Order Lifecycle API
+      const response = await wisherAPI.createOrder(orderData, sessionToken);
+      
+      console.log('Order response:', response);
+      
+      // Clear cart from the original backend as well
+      await axios.delete(`${BACKEND_URL}/api/cart/clear?vendor_id=${vendorId}`, {
+        headers: { Authorization: `Bearer ${sessionToken}` }
+      });
       
       setShowCheckoutModal(false);
       setCart([]);
       setCartMap({});
-      setPlacedOrder(response.data.order);
+      
+      // Build placed order object for invoice display
+      setPlacedOrder({
+        order_id: response.order_id || response.id || 'new-order',
+        vendor_name: vendor?.name || 'Shop',
+        vendor_image: vendor?.image,
+        vendor_address: vendor?.location?.address,
+        items: orderItems.map(item => ({
+          ...item,
+          total: item.price * item.quantity,
+        })),
+        subtotal: subtotal,
+        tax_rate: 0.05,
+        tax_amount: taxAmount,
+        delivery_fee: deliveryFee,
+        grand_total: grandTotal,
+        delivery_address: { address: deliveryAddress },
+        delivery_type: deliveryType,
+      });
+      
       setShowConfetti(true);
       setShowInvoiceModal(true);
       
