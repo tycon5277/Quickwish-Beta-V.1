@@ -135,7 +135,8 @@ export default function LocalHubScreen() {
 
   useEffect(() => {
     fetchVendors();
-  }, [fetchVendors]);
+    fetchFeaturedShops();
+  }, [fetchVendors, fetchFeaturedShops]);
 
   useEffect(() => {
     fetchCartSummary();
