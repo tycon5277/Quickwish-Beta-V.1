@@ -277,7 +277,7 @@ export default function HomeScreen() {
 
   // Banner Carousel Component - Redesigned for better UX
   const BANNER_WIDTH = SCREEN_WIDTH - 40; // Full width minus side margins
-  const BANNER_HEIGHT = 140; // Slightly reduced height for better proportions
+  const BANNER_HEIGHT = 150; // Good height for visibility
   
   const BannerCarousel = ({ bannerData, onBannerPress }: { bannerData: any[], onBannerPress: (banner: any) => void }) => {
     const [activeIndex, setActiveIndex] = useState(0);
@@ -299,66 +299,57 @@ export default function HomeScreen() {
 
     if (bannerData.length === 0) return null;
 
-    const getItemLayout = (_: any, index: number) => ({
-      length: BANNER_WIDTH,
-      offset: BANNER_WIDTH * index,
-      index,
-    });
-
     return (
       <View style={styles.bannerCarouselContainer}>
-        <FlatList
-          ref={flatListRef}
-          data={bannerData}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={BANNER_WIDTH}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          getItemLayout={getItemLayout}
-          contentContainerStyle={styles.bannerListContent}
-          onMomentumScrollEnd={(e) => {
-            const index = Math.round(e.nativeEvent.contentOffset.x / BANNER_WIDTH);
-            setActiveIndex(index);
-          }}
-          keyExtractor={(item) => item.banner_id}
-          renderItem={({ item, index }) => (
-            <TouchableOpacity 
-              style={[
-                styles.bannerCard,
-                { width: BANNER_WIDTH, height: BANNER_HEIGHT }
-              ]}
-              onPress={() => onBannerPress(item)}
-              activeOpacity={0.95}
-            >
-              <Image 
-                source={{ uri: item.image }} 
-                style={styles.bannerImage}
-                resizeMode="cover"
-              />
-              {/* Gradient Overlay for better text readability */}
-              <View style={styles.bannerGradientOverlay} />
-              
-              {/* Content Container */}
-              <View style={styles.bannerContentContainer}>
-                {/* AD Badge - Top Left with proper spacing */}
-                <View style={styles.bannerAdBadge}>
-                  <Text style={styles.bannerAdText}>AD</Text>
-                </View>
+        {/* Centered Banner */}
+        <View style={styles.bannerWrapper}>
+          <FlatList
+            ref={flatListRef}
+            data={bannerData}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={BANNER_WIDTH}
+            snapToAlignment="center"
+            decelerationRate="fast"
+            onMomentumScrollEnd={(e) => {
+              const index = Math.round(e.nativeEvent.contentOffset.x / BANNER_WIDTH);
+              setActiveIndex(index);
+            }}
+            keyExtractor={(item) => item.banner_id}
+            renderItem={({ item }) => (
+              <TouchableOpacity 
+                style={[styles.bannerCard, { width: BANNER_WIDTH, height: BANNER_HEIGHT }]}
+                onPress={() => onBannerPress(item)}
+                activeOpacity={0.9}
+              >
+                {/* Banner Image */}
+                <Image 
+                  source={{ uri: item.image }} 
+                  style={styles.bannerImage}
+                  resizeMode="cover"
+                />
                 
-                {/* Text Content - Bottom */}
+                {/* Dark gradient overlay for text visibility */}
+                <View style={styles.bannerGradientOverlay} />
+                
+                {/* Text Content - Bottom Left */}
                 <View style={styles.bannerTextContainer}>
                   <Text style={styles.bannerTitle} numberOfLines={1}>{item.title}</Text>
                   {item.subtitle && (
                     <Text style={styles.bannerSubtitle} numberOfLines={1}>{item.subtitle}</Text>
                   )}
                 </View>
-              </View>
-            </TouchableOpacity>
-          )}
-        />
+                
+                {/* AD Badge - Bottom Right, subtle white */}
+                <View style={styles.bannerAdBadge}>
+                  <Text style={styles.bannerAdText}>Ad</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
         
-        {/* Pagination Dots - Below banner with proper spacing */}
+        {/* Pagination Dots */}
         {bannerData.length > 1 && (
           <View style={styles.bannerIndicators}>
             {bannerData.map((_: any, index: number) => (
