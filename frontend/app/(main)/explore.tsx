@@ -153,8 +153,17 @@ const SEARCH_CATEGORIES = [
 ];
 
 export default function ExploreScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [posts] = useState<FeedPost[]>(FEED_POSTS);
+  const { user } = useAuth();
+  
+  // API-loaded data
+  const [feedPosts, setFeedPosts] = useState<any[]>([]);
+  const [promotedHighlights, setPromotedHighlights] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Fallback to mock data
+  const [posts, setPosts] = useState<FeedPost[]>(FEED_POSTS);
   const [stories, setStories] = useState<Story[]>(INITIAL_STORIES);
   const [refreshing, setRefreshing] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
@@ -163,6 +172,89 @@ export default function ExploreScreen() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchCategory, setSearchCategory] = useState('all');
+
+  // Fetch Explore data from API
+  const fetchExploreData = useCallback(async () => {
+    try {
+      // Fetch promoted highlights for stories/carousel
+      const promotedRes = await fetch(`${PROMOTIONS_BACKEND_URL}/api/wisher/explore/promoted`);
+      if (promotedRes.ok) {
+        const promoted = await promotedRes.json();
+        setPromotedHighlights(promoted);
+      }
+      
+      // Fetch feed posts
+      const feedRes = await fetch(`${PROMOTIONS_BACKEND_URL}/api/wisher/explore/feed?page=1&limit=20`);
+      if (feedRes.ok) {
+        const feed = await feedRes.json();
+        setFeedPosts(feed);
+      }
+    } catch (error) {
+      console.log('Error fetching explore data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchExploreData();
+  }, [fetchExploreData]);
+
+  // Handle Like Post
+  const handleLikePost = async (postId: string) => {
+    const userId = user?.user_id;
+    if (!userId) return;
+    
+    try {
+      const res = await fetch(`${PROMOTIONS_BACKEND_URL}/api/wisher/posts/${postId}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setFeedPosts(prev => prev.map(p => 
+          p.post_id === postId 
+            ? { ...p, likes: data.likes, liked_by: data.liked ? [...(p.liked_by || []), userId] : (p.liked_by || []).filter((id: string) => id !== userId) }
+            : p
+        ));
+        // Also update local liked state
+        setLikedPosts(prev => {
+          const newSet = new Set(prev);
+          if (data.liked) {
+            newSet.add(postId);
+          } else {
+            newSet.delete(postId);
+          }
+          return newSet;
+        });
+      }
+    } catch (error) {
+      console.log('Error liking post:', error);
+    }
+  };
+
+  // Handle Follow Shop
+  const handleFollowShop = async (vendorId: string) => {
+    const userId = user?.user_id;
+    if (!userId) return;
+    
+    try {
+      const res = await fetch(`${PROMOTIONS_BACKEND_URL}/api/wisher/shops/${vendorId}/follow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        console.log(data.following ? 'Following shop!' : 'Unfollowed shop');
+      }
+    } catch (error) {
+      console.log('Error following shop:', error);
+    }
+  };
   
   // Story progress animation
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -176,6 +268,44 @@ export default function ExploreScreen() {
   
   const HIGHLIGHT_CARD_WIDTH = SCREEN_WIDTH * 0.75 + 12; // card width + margin
   const AUTO_SCROLL_INTERVAL = 3500; // 3.5 seconds
+
+  // Map API data to display format, with fallback to mock data
+  const displayStories = promotedHighlights.length > 0 
+    ? promotedHighlights.map((post: any) => ({
+        id: post.post_id,
+        user_name: post.vendor_name,
+        user_image: post.vendor_image || 'https://via.placeholder.com/100',
+        creator_type: 'vendor' as CreatorType,
+        category: post.category || 'Promoted',
+        is_live: false,
+        viewed: false,
+        image: post.images?.[0] || 'https://via.placeholder.com/400',
+        text: post.content?.substring(0, 50) || '',
+      }))
+    : stories;
+
+  const displayPosts = feedPosts.length > 0
+    ? feedPosts.map((post: any) => ({
+        id: post.post_id,
+        creator_type: 'vendor' as CreatorType,
+        creator_name: post.vendor_name,
+        creator_image: post.vendor_image || 'https://via.placeholder.com/100',
+        creator_category: post.category || 'Shop',
+        is_verified: true,
+        images: post.images || [],
+        caption: post.content,
+        likes: post.likes || 0,
+        comments: post.comments || 0,
+        timestamp: post.created_at ? formatTimeAgo(post.created_at) : 'Recently',
+        tags: [],
+        milestone: undefined,
+        promo_link: undefined,
+        rating: undefined,
+        completedJobs: undefined,
+        isPromoted: post.is_promoted || post.is_highlighted,
+        vendor_id: post.vendor_id,
+      }))
+    : posts;
 
   // Get sorted stories (unviewed first, then viewed)
   const sortedStories = [...stories].sort((a, b) => {
