@@ -441,9 +441,11 @@ export default function ExploreScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // Reset viewed status on refresh
-    setStories(INITIAL_STORIES);
+    await fetchExploreData();
+    // Reset viewed status on refresh for mock data
+    if (promotedHighlights.length === 0) {
+      setStories(INITIAL_STORIES);
+    }
     setRefreshing(false);
   };
 
