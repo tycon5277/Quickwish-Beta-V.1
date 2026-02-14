@@ -695,9 +695,9 @@ export default function ExploreScreen() {
                   )}
 
                   {/* Image Indicators */}
-                  {post.images.length > 1 && (
+                  {post.images && post.images.length > 1 && (
                     <View style={styles.imageIndicators}>
-                      {post.images.map((_, idx) => (
+                      {post.images.map((_: any, idx: number) => (
                         <View 
                           key={idx}
                           style={[styles.imageIndicator, currentImg === idx && styles.imageIndicatorActive]}
