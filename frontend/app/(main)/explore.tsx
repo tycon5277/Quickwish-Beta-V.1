@@ -469,16 +469,16 @@ export default function ExploreScreen() {
   };
 
   const getFilteredSearchResults = () => {
-    let filtered = posts;
+    let filtered = displayPosts;
     if (searchQuery.trim()) {
-      filtered = filtered.filter(p => 
-        p.creator_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.caption.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.creator_category.toLowerCase().includes(searchQuery.toLowerCase())
+      filtered = filtered.filter((p: any) => 
+        p.creator_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.caption?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.creator_category?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
     if (searchCategory !== 'all') {
-      filtered = filtered.filter(p => p.creator_type === searchCategory);
+      filtered = filtered.filter((p: any) => p.creator_type === searchCategory);
     }
     return filtered;
   };
