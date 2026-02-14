@@ -803,4 +803,67 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginLeft: 8,
   },
+  // Banner Carousel Styles
+  bannerCarouselContainer: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  bannerCard: {
+    width: SCREEN_WIDTH - 40,
+    height: 160,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginHorizontal: 20,
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  bannerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  bannerTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  bannerSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+  },
+  bannerAdBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  bannerAdText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  bannerIndicators: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 8,
+    gap: 6,
+  },
+  bannerDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#D1D5DB',
+  },
+  bannerDotActive: {
+    width: 20,
+    backgroundColor: '#6366F1',
+  },
 });
