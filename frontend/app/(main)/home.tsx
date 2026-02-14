@@ -275,10 +275,8 @@ export default function HomeScreen() {
   const userName = user?.name?.split(' ')[0] || 'User';
   const greeting = isReturningUser ? `Welcome back` : `Welcome`;
 
-  // Banner Carousel Component - Flipkart-style centered banner
-  const BANNER_MARGIN = 20; // Side margins (same as content padding)
-  const BANNER_WIDTH = SCREEN_WIDTH - (BANNER_MARGIN * 2); // Full width minus margins
-  const BANNER_HEIGHT = 160; // Good height for visibility
+  // Banner Carousel Component - Clean swipe with no peek
+  const BANNER_HEIGHT = 160;
   
   const BannerCarousel = ({ bannerData, onBannerPress }: { bannerData: any[], onBannerPress: (banner: any) => void }) => {
     const [activeIndex, setActiveIndex] = useState(0);
