@@ -276,7 +276,7 @@ export default function HomeScreen() {
   const greeting = isReturningUser ? `Welcome back` : `Welcome`;
 
   // Banner Carousel Component - Flipkart-style centered banner
-  const BANNER_MARGIN = 16; // Side margins
+  const BANNER_MARGIN = 20; // Side margins (same as content padding)
   const BANNER_WIDTH = SCREEN_WIDTH - (BANNER_MARGIN * 2); // Full width minus margins
   const BANNER_HEIGHT = 160; // Good height for visibility
   
@@ -291,7 +291,7 @@ export default function HomeScreen() {
       const interval = setInterval(() => {
         setActiveIndex((prev) => {
           const next = (prev + 1) % bannerData.length;
-          scrollViewRef.current?.scrollTo({ x: next * BANNER_WIDTH, animated: true });
+          scrollViewRef.current?.scrollTo({ x: next * SCREEN_WIDTH, animated: true });
           return next;
         });
       }, 4000);
@@ -303,7 +303,7 @@ export default function HomeScreen() {
 
     const handleScroll = (event: any) => {
       const offsetX = event.nativeEvent.contentOffset.x;
-      const index = Math.round(offsetX / BANNER_WIDTH);
+      const index = Math.round(offsetX / SCREEN_WIDTH);
       if (index !== activeIndex && index >= 0 && index < bannerData.length) {
         setActiveIndex(index);
       }
@@ -311,47 +311,43 @@ export default function HomeScreen() {
 
     return (
       <View style={styles.bannerCarouselContainer}>
-        {/* Banner ScrollView - Centered */}
+        {/* Banner ScrollView */}
         <ScrollView
           ref={scrollViewRef}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           onMomentumScrollEnd={handleScroll}
-          contentContainerStyle={styles.bannerScrollContent}
-          style={styles.bannerScrollView}
           decelerationRate="fast"
         >
           {bannerData.map((item, index) => (
-            <TouchableOpacity 
-              key={item.banner_id}
-              style={styles.bannerCard}
-              onPress={() => onBannerPress(item)}
-              activeOpacity={0.95}
-            >
-              {/* Banner Image */}
-              <Image 
-                source={{ uri: item.image }} 
-                style={styles.bannerImage}
-                resizeMode="cover"
-              />
-              
-              {/* Gradient overlay for text */}
-              <View style={styles.bannerGradientOverlay} />
-              
-              {/* Text Content - Bottom */}
-              <View style={styles.bannerTextContainer}>
-                <Text style={styles.bannerTitle} numberOfLines={1}>{item.title}</Text>
-                {item.subtitle && (
-                  <Text style={styles.bannerSubtitle} numberOfLines={1}>{item.subtitle}</Text>
-                )}
-              </View>
-              
-              {/* AD Badge - Bottom Right */}
-              <View style={styles.bannerAdBadge}>
-                <Text style={styles.bannerAdText}>Ad</Text>
-              </View>
-            </TouchableOpacity>
+            <View key={item.banner_id} style={styles.bannerSlide}>
+              <TouchableOpacity 
+                style={styles.bannerCard}
+                onPress={() => onBannerPress(item)}
+                activeOpacity={0.95}
+              >
+                {/* Banner Image */}
+                <Image 
+                  source={{ uri: item.image }} 
+                  style={styles.bannerImage}
+                  resizeMode="cover"
+                />
+                
+                {/* Text Content - Bottom */}
+                <View style={styles.bannerTextContainer}>
+                  <Text style={styles.bannerTitle} numberOfLines={1}>{item.title}</Text>
+                  {item.subtitle && (
+                    <Text style={styles.bannerSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+                  )}
+                </View>
+                
+                {/* AD Badge - Bottom Right */}
+                <View style={styles.bannerAdBadge}>
+                  <Text style={styles.bannerAdText}>Ad</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
           ))}
         </ScrollView>
         
