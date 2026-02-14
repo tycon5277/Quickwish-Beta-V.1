@@ -331,6 +331,7 @@ export default function LocalHubScreen() {
             {/* Vendor Cards */}
             {filteredVendors.map((vendor) => {
               const cartCount = cartSummary[vendor.vendor_id] || 0;
+              const isFeatured = featuredShopIds.includes(vendor.vendor_id);
               
               return (
                 <TouchableOpacity 
@@ -352,8 +353,15 @@ export default function LocalHubScreen() {
                         <Ionicons name="storefront" size={36} color="#9CA3AF" />
                       </View>
                     )}
+                    {/* Featured Badge */}
+                    {isFeatured && (
+                      <View style={styles.featuredBadge}>
+                        <Ionicons name="star" size={10} color="#fff" />
+                        <Text style={styles.featuredBadgeText}>FEATURED</Text>
+                      </View>
+                    )}
                     {/* Category Badge */}
-                    <View style={styles.categoryBadge}>
+                    <View style={[styles.categoryBadge, isFeatured && { top: 30 }]}>
                       <Text style={styles.categoryBadgeText}>{vendor.category}</Text>
                     </View>
                     {/* Verified Badge */}
