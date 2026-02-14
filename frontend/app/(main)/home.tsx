@@ -116,6 +116,7 @@ export default function HomeScreen() {
   useEffect(() => {
     fetchLocation();
     fetchWishes();
+    fetchBanners();
   }, []);
 
   // Refresh when wishesRefreshTrigger changes
