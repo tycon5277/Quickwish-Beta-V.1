@@ -145,11 +145,20 @@ export default function LocalHubScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchVendors(), fetchCartSummary(), fetchOrderCount()]);
+    await Promise.all([fetchVendors(), fetchCartSummary(), fetchOrderCount(), fetchFeaturedShops()]);
     setRefreshing(false);
   };
 
-  const filteredVendors = vendors.filter(v => 
+  // Sort vendors to show featured first
+  const sortedVendors = [...vendors].sort((a, b) => {
+    const aFeatured = featuredShopIds.includes(a.vendor_id);
+    const bFeatured = featuredShopIds.includes(b.vendor_id);
+    if (aFeatured && !bFeatured) return -1;
+    if (!aFeatured && bFeatured) return 1;
+    return 0;
+  });
+
+  const filteredVendors = sortedVendors.filter(v => 
     v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     v.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
