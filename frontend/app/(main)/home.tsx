@@ -275,7 +275,10 @@ export default function HomeScreen() {
   const userName = user?.name?.split(' ')[0] || 'User';
   const greeting = isReturningUser ? `Welcome back` : `Welcome`;
 
-  // Banner Carousel Component
+  // Banner Carousel Component - Redesigned for better UX
+  const BANNER_WIDTH = SCREEN_WIDTH - 40; // Full width minus side margins
+  const BANNER_HEIGHT = 140; // Slightly reduced height for better proportions
+  
   const BannerCarousel = ({ bannerData, onBannerPress }: { bannerData: any[], onBannerPress: (banner: any) => void }) => {
     const [activeIndex, setActiveIndex] = useState(0);
     const flatListRef = useRef<FlatList>(null);
@@ -289,12 +292,18 @@ export default function HomeScreen() {
           flatListRef.current?.scrollToIndex({ index: next, animated: true });
           return next;
         });
-      }, 5000);
+      }, 4000);
       
       return () => clearInterval(interval);
     }, [bannerData.length]);
 
     if (bannerData.length === 0) return null;
+
+    const getItemLayout = (_: any, index: number) => ({
+      length: BANNER_WIDTH,
+      offset: BANNER_WIDTH * index,
+      index,
+    });
 
     return (
       <View style={styles.bannerCarouselContainer}>
@@ -302,34 +311,54 @@ export default function HomeScreen() {
           ref={flatListRef}
           data={bannerData}
           horizontal
-          pagingEnabled
           showsHorizontalScrollIndicator={false}
+          snapToInterval={BANNER_WIDTH}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          getItemLayout={getItemLayout}
+          contentContainerStyle={styles.bannerListContent}
           onMomentumScrollEnd={(e) => {
-            const index = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_WIDTH - 40));
+            const index = Math.round(e.nativeEvent.contentOffset.x / BANNER_WIDTH);
             setActiveIndex(index);
           }}
           keyExtractor={(item) => item.banner_id}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <TouchableOpacity 
-              style={styles.bannerCard}
+              style={[
+                styles.bannerCard,
+                { width: BANNER_WIDTH, height: BANNER_HEIGHT }
+              ]}
               onPress={() => onBannerPress(item)}
-              activeOpacity={0.9}
+              activeOpacity={0.95}
             >
               <Image 
                 source={{ uri: item.image }} 
                 style={styles.bannerImage}
                 resizeMode="cover"
               />
-              <View style={styles.bannerOverlay}>
-                <Text style={styles.bannerTitle}>{item.title}</Text>
-                {item.subtitle && <Text style={styles.bannerSubtitle}>{item.subtitle}</Text>}
-              </View>
-              <View style={styles.bannerAdBadge}>
-                <Text style={styles.bannerAdText}>AD</Text>
+              {/* Gradient Overlay for better text readability */}
+              <View style={styles.bannerGradientOverlay} />
+              
+              {/* Content Container */}
+              <View style={styles.bannerContentContainer}>
+                {/* AD Badge - Top Left with proper spacing */}
+                <View style={styles.bannerAdBadge}>
+                  <Text style={styles.bannerAdText}>AD</Text>
+                </View>
+                
+                {/* Text Content - Bottom */}
+                <View style={styles.bannerTextContainer}>
+                  <Text style={styles.bannerTitle} numberOfLines={1}>{item.title}</Text>
+                  {item.subtitle && (
+                    <Text style={styles.bannerSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+                  )}
+                </View>
               </View>
             </TouchableOpacity>
           )}
         />
+        
+        {/* Pagination Dots - Below banner with proper spacing */}
         {bannerData.length > 1 && (
           <View style={styles.bannerIndicators}>
             {bannerData.map((_: any, index: number) => (
