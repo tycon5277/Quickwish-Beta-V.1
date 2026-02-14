@@ -43,6 +43,7 @@ export default function HomeScreen() {
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [banners, setBanners] = useState<any[]>([]);
 
   // Check if returning user on mount
   useEffect(() => {
