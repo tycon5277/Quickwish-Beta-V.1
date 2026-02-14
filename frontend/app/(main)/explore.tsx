@@ -733,7 +733,13 @@ export default function ExploreScreen() {
                     <View style={styles.actionLeft}>
                       <TouchableOpacity 
                         style={styles.actionItem}
-                        onPress={() => toggleLike(post.id)}
+                        onPress={() => {
+                          toggleLike(post.id);
+                          // Also call API if it's from the API
+                          if (feedPosts.length > 0 && post.vendor_id) {
+                            handleLikePost(post.id);
+                          }
+                        }}
                       >
                         <Ionicons 
                           name={isLiked ? "heart" : "heart-outline"} 
