@@ -611,8 +611,8 @@ export default function ExploreScreen() {
         <View style={styles.feedSection}>
           <Text style={styles.sectionLabel}>DISCOVER</Text>
           
-          {posts.map((post) => {
-            const config = CREATOR_CONFIG[post.creator_type];
+          {displayPosts.map((post: any) => {
+            const config = CREATOR_CONFIG[post.creator_type] || CREATOR_CONFIG['vendor'];
             const isLiked = likedPosts.has(post.id);
             const currentImg = currentImageIndex[post.id] || 0;
 
@@ -621,14 +621,22 @@ export default function ExploreScreen() {
                 {/* Post Image with Overlay */}
                 <TouchableOpacity 
                   style={styles.postImageContainer}
-                  onPress={() => post.images.length > 1 && nextImage(post.id, post.images.length)}
+                  onPress={() => post.images && post.images.length > 1 && nextImage(post.id, post.images.length)}
                   activeOpacity={0.95}
                 >
                   <Image 
-                    source={{ uri: post.images[currentImg] }} 
+                    source={{ uri: post.images?.[currentImg] || 'https://via.placeholder.com/400' }} 
                     style={styles.postImage}
                     resizeMode="cover"
                   />
+                  
+                  {/* PROMOTED Badge */}
+                  {post.isPromoted && (
+                    <View style={styles.promotedBadge}>
+                      <Ionicons name="megaphone" size={12} color="#F59E0B" />
+                      <Text style={styles.promotedBadgeText}>PROMOTED</Text>
+                    </View>
+                  )}
                   
                   {/* Gradient Overlay */}
                   <LinearGradient
