@@ -62,6 +62,7 @@ export default function LocalHubScreen() {
   const [showRadiusSlider, setShowRadiusSlider] = useState(false);
   const [cartSummary, setCartSummary] = useState<Record<string, number>>({});
   const [orderCount, setOrderCount] = useState(0);
+  const [featuredShopIds, setFeaturedShopIds] = useState<string[]>([]);
 
   const fetchVendors = useCallback(async () => {
     try {
