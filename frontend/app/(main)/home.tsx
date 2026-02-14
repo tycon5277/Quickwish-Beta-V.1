@@ -364,6 +364,11 @@ export default function HomeScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
+        {/* Promotional Banners Carousel */}
+        {banners.length > 0 && (
+          <BannerCarousel bannerData={banners} onBannerPress={handleBannerPress} />
+        )}
+
         {/* Make a Wish Card */}
         <TouchableOpacity
           style={styles.makeWishCard}
