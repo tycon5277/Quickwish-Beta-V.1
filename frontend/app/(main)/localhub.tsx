@@ -724,6 +724,23 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 2,
   },
+  featuredBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  featuredBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#fff',
+  },
   vendorCartBadge: {
     position: 'absolute',
     top: 6,
