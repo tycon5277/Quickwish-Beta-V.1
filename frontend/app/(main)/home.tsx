@@ -52,6 +52,19 @@ export default function HomeScreen() {
     }
   }, [user?.email]);
 
+  // Fetch promotional banners
+  const fetchBanners = useCallback(async () => {
+    try {
+      const res = await fetch(`${PROMOTIONS_BACKEND_URL}/api/wisher/home/banners`);
+      if (res.ok) {
+        const data = await res.json();
+        setBanners(data);
+      }
+    } catch (error) {
+      console.log('Error fetching banners:', error);
+    }
+  }, []);
+
   const fetchLocation = useCallback(async () => {
     try {
       const { status } = await Location.getForegroundPermissionsAsync();
