@@ -9,7 +9,7 @@ import { useAuth } from './_layout';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
-                   'https://order-lifecycle-8.preview.emergentagent.com';
+                   'https://wisher-mock-promo.preview.emergentagent.com';
 
 interface Wish {
   wish_id: string;

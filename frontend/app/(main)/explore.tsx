@@ -10,7 +10,7 @@ import { formatTimeAgo } from '../../utils/formatTime';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Promotions Backend URL
-const PROMOTIONS_BACKEND_URL = 'https://promote-feature.preview.emergentagent.com';
+const PROMOTIONS_BACKEND_URL = 'https://wisher-mock-promo.preview.emergentagent.com';
 
 // Creator Types
 type CreatorType = 'agent' | 'vendor' | 'promoter';

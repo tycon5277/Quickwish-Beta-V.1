@@ -12,7 +12,7 @@ import { wisherAPI, CreateOrderData } from '../../utils/api';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || 
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
-                   'https://order-lifecycle-8.preview.emergentagent.com';
+                   'https://wisher-mock-promo.preview.emergentagent.com';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // External Order Lifecycle API
-const ORDER_API_BASE = 'https://order-lifecycle-7.preview.emergentagent.com';
+const ORDER_API_BASE = 'https://wisher-mock-promo.preview.emergentagent.com';
 
 const orderApi = axios.create({
   baseURL: ORDER_API_BASE,
