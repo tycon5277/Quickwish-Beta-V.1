@@ -863,43 +863,45 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginLeft: 8,
   },
-  // Banner Carousel Styles - Eye-catching & Centered
+  // Banner Carousel Styles - Flipkart-style
   bannerCarouselContainer: {
     marginTop: 12,
-    marginBottom: 20, // More space before Make a Wish
+    marginBottom: 20,
   },
-  bannerWrapper: {
-    alignItems: 'center', // Center the banner horizontally
+  bannerScrollView: {
+    // ScrollView takes full width
+  },
+  bannerScrollContent: {
+    paddingHorizontal: 16, // Equal padding on both sides
   },
   bannerCard: {
-    marginHorizontal: 20, // Equal margins on both sides
-    borderRadius: 16,
+    width: SCREEN_WIDTH - 32, // Full width minus 16px padding on each side
+    height: 160,
+    borderRadius: 16, // All corners rounded equally
     overflow: 'hidden',
-    backgroundColor: '#1F2937',
-    // Shadow for eye-catching effect
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
+    backgroundColor: '#E5E7EB',
+    marginRight: 0, // No gap between items for pagingEnabled
   },
   bannerImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 16, // Match card border radius
   },
   bannerGradientOverlay: {
     ...StyleSheet.absoluteFillObject,
-    // Dark gradient from bottom for text visibility
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    borderRadius: 16,
   },
   bannerTextContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
   },
   bannerTitle: {
     color: '#fff',
@@ -907,41 +909,39 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   bannerSubtitle: {
-    color: 'rgba(255,255,255,0.85)',
+    color: 'rgba(255,255,255,0.9)',
     fontSize: 13,
-    marginTop: 3,
+    marginTop: 2,
   },
-  // AD Badge - Bottom Right, Subtle White
   bannerAdBadge: {
     position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    bottom: 14,
+    right: 14,
+    backgroundColor: 'rgba(255,255,255,0.3)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
   },
   bannerAdText: {
-    color: 'rgba(255,255,255,0.9)',
+    color: '#fff',
     fontSize: 9,
     fontWeight: '600',
-    letterSpacing: 0.3,
   },
   bannerIndicators: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 14,
+    marginTop: 12,
     gap: 6,
   },
   bannerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: '#D1D5DB',
   },
   bannerDotActive: {
-    width: 20,
+    width: 24,
     backgroundColor: '#7C3AED',
   },
 });
