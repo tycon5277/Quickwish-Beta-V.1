@@ -864,36 +864,27 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 20,
   },
-  bannerScrollView: {
-    // ScrollView takes full width
-  },
-  bannerScrollContent: {
-    paddingHorizontal: 16, // Equal padding on both sides
+  bannerSlide: {
+    width: SCREEN_WIDTH, // Full screen width for paging
+    paddingHorizontal: 20, // 20px padding on each side = centered card
   },
   bannerCard: {
-    width: SCREEN_WIDTH - 32, // Full width minus 16px padding on each side
+    width: '100%', // Takes full width of slide minus padding
     height: 160,
-    borderRadius: 16, // All corners rounded equally
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#E5E7EB',
-    marginRight: 0, // No gap between items for pagingEnabled
   },
   bannerImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 16, // Match card border radius
-  },
-  bannerGradientOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-    borderRadius: 16,
   },
   bannerTextContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomLeftRadius: 16,
