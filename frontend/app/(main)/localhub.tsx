@@ -18,6 +18,13 @@ const PROMOTIONS_BACKEND_URL = 'https://wisher-mock-promo.preview.emergentagent.
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// MOCK DATA FOR VISUALIZATION - These IDs should match vendor_ids from the seeded data
+// The first few vendors will be shown as "FEATURED"
+const MOCK_FEATURED_VENDOR_IDS = [
+  'vendor-001', // Will be featured if exists
+  'vendor-002', // Will be featured if exists
+];
+
 interface HubVendor {
   vendor_id: string;
   name: string;
@@ -110,8 +117,13 @@ export default function LocalHubScreen() {
     }
   }, [sessionToken]);
 
-  // Fetch featured shop IDs from Promotions API
+  // Fetch featured shop IDs - Using MOCK DATA for visualization
   const fetchFeaturedShops = useCallback(async () => {
+    // MOCK DATA: Comment this block and uncomment the fetch below after testing
+    setFeaturedShopIds(MOCK_FEATURED_VENDOR_IDS);
+    return;
+    
+    /* LIVE API - Uncomment after testing
     try {
       const res = await fetch(`${PROMOTIONS_BACKEND_URL}/api/wisher/localhub/featured?lat=12.9716&lng=77.5946`);
       if (res.ok) {
@@ -121,6 +133,7 @@ export default function LocalHubScreen() {
     } catch (error) {
       console.log('Error fetching featured shops:', error);
     }
+    */
   }, []);
 
   const seedVendors = async () => {

@@ -18,6 +18,34 @@ const PROMOTIONS_BACKEND_URL = 'https://wisher-mock-promo.preview.emergentagent.
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+// MOCK DATA FOR VISUALIZATION - Remove after testing
+const MOCK_BANNERS = [
+  {
+    banner_id: 'mock-1',
+    image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800',
+    title: 'Fresh Groceries Delivered',
+    subtitle: 'Up to 30% off on first order',
+    link_type: 'shop',
+    link_target: 'vendor-001',
+  },
+  {
+    banner_id: 'mock-2',
+    image: 'https://images.unsplash.com/photo-1526367790999-0150786686a2?w=800',
+    title: 'Fast & Reliable Delivery',
+    subtitle: 'Order now, get it in 30 mins',
+    link_type: 'shop',
+    link_target: 'vendor-002',
+  },
+  {
+    banner_id: 'mock-3',
+    image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800',
+    title: 'Local Restaurants Near You',
+    subtitle: 'Discover amazing food today',
+    link_type: 'shop',
+    link_target: 'vendor-003',
+  },
+];
+
 interface Wish {
   wish_id: string;
   wish_type: string;
@@ -52,8 +80,13 @@ export default function HomeScreen() {
     }
   }, [user?.email]);
 
-  // Fetch promotional banners
+  // Fetch promotional banners - Using MOCK DATA for visualization
   const fetchBanners = useCallback(async () => {
+    // MOCK DATA: Comment this block and uncomment the fetch below after testing
+    setBanners(MOCK_BANNERS);
+    return;
+    
+    /* LIVE API - Uncomment after testing
     try {
       const res = await fetch(`${PROMOTIONS_BACKEND_URL}/api/wisher/home/banners`);
       if (res.ok) {
@@ -63,6 +96,7 @@ export default function HomeScreen() {
     } catch (error) {
       console.log('Error fetching banners:', error);
     }
+    */
   }, []);
 
   const fetchLocation = useCallback(async () => {
