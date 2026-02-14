@@ -659,7 +659,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#7C3AED',
     borderRadius: 16,
     padding: 20,
-    marginTop: 20,
+    marginTop: 8, // Reduced since banner container already has marginBottom: 20
   },
   makeWishIcon: {
     width: 56,
