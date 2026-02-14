@@ -110,6 +110,19 @@ export default function LocalHubScreen() {
     }
   }, [sessionToken]);
 
+  // Fetch featured shop IDs from Promotions API
+  const fetchFeaturedShops = useCallback(async () => {
+    try {
+      const res = await fetch(`${PROMOTIONS_BACKEND_URL}/api/wisher/localhub/featured?lat=12.9716&lng=77.5946`);
+      if (res.ok) {
+        const data = await res.json();
+        setFeaturedShopIds(data.featured_vendor_ids || []);
+      }
+    } catch (error) {
+      console.log('Error fetching featured shops:', error);
+    }
+  }, []);
+
   const seedVendors = async () => {
     try {
       setIsLoading(true);
