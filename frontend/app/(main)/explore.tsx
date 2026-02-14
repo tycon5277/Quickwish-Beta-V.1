@@ -173,8 +173,16 @@ export default function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchCategory, setSearchCategory] = useState('all');
 
-  // Fetch Explore data from API
+  // Fetch Explore data - Using MOCK DATA for visualization
   const fetchExploreData = useCallback(async () => {
+    // MOCK DATA: The INITIAL_STORIES and FEED_POSTS constants are used as fallback
+    // Since we're setting empty arrays, the displayStories and displayPosts will use the fallback mock data
+    setPromotedHighlights([]); // Empty = will use INITIAL_STORIES fallback
+    setFeedPosts([]); // Empty = will use FEED_POSTS fallback
+    setIsLoading(false);
+    return;
+    
+    /* LIVE API - Uncomment after testing
     try {
       // Fetch promoted highlights for stories/carousel
       const promotedRes = await fetch(`${PROMOTIONS_BACKEND_URL}/api/wisher/explore/promoted`);
@@ -194,6 +202,7 @@ export default function ExploreScreen() {
     } finally {
       setIsLoading(false);
     }
+    */
   }, []);
 
   useEffect(() => {
