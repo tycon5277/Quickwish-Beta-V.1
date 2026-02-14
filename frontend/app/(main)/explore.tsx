@@ -308,7 +308,7 @@ export default function ExploreScreen() {
     : posts;
 
   // Get sorted stories (unviewed first, then viewed)
-  const sortedStories = [...stories].sort((a, b) => {
+  const sortedStories = [...displayStories].sort((a, b) => {
     if (a.viewed === b.viewed) return 0;
     return a.viewed ? 1 : -1;
   });
