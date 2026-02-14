@@ -3,8 +3,14 @@ import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, I
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../_layout';
+import { formatTimeAgo } from '../../utils/formatTime';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Promotions Backend URL
+const PROMOTIONS_BACKEND_URL = 'https://promote-feature.preview.emergentagent.com';
 
 // Creator Types
 type CreatorType = 'agent' | 'vendor' | 'promoter';
