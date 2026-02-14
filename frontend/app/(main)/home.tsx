@@ -135,8 +135,21 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchLocation(), fetchWishes()]);
+    await Promise.all([fetchLocation(), fetchWishes(), fetchBanners()]);
     setRefreshing(false);
+  };
+
+  // Handle banner press - track click and navigate
+  const handleBannerPress = async (banner: any) => {
+    try {
+      await fetch(`${PROMOTIONS_BACKEND_URL}/api/wisher/banners/${banner.banner_id}/click`, { method: 'POST' });
+    } catch (e) {}
+    
+    if (banner.link_type === 'shop') {
+      router.push(`/shop/${banner.link_target}`);
+    } else if (banner.link_type === 'product') {
+      router.push(`/shop/product/${banner.link_target}`);
+    }
   };
 
   const handleCompleteWish = async (wishId: string) => {
