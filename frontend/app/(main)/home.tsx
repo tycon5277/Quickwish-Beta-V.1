@@ -241,6 +241,78 @@ export default function HomeScreen() {
   const userName = user?.name?.split(' ')[0] || 'User';
   const greeting = isReturningUser ? `Welcome back` : `Welcome`;
 
+  // Banner Carousel Component
+  const BannerCarousel = ({ bannerData, onBannerPress }: { bannerData: any[], onBannerPress: (banner: any) => void }) => {
+    const [activeIndex, setActiveIndex] = useState(0);
+    const flatListRef = useRef<FlatList>(null);
+
+    useEffect(() => {
+      if (bannerData.length <= 1) return;
+      
+      const interval = setInterval(() => {
+        setActiveIndex((prev) => {
+          const next = (prev + 1) % bannerData.length;
+          flatListRef.current?.scrollToIndex({ index: next, animated: true });
+          return next;
+        });
+      }, 5000);
+      
+      return () => clearInterval(interval);
+    }, [bannerData.length]);
+
+    if (bannerData.length === 0) return null;
+
+    return (
+      <View style={styles.bannerCarouselContainer}>
+        <FlatList
+          ref={flatListRef}
+          data={bannerData}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(e) => {
+            const index = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_WIDTH - 40));
+            setActiveIndex(index);
+          }}
+          keyExtractor={(item) => item.banner_id}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={styles.bannerCard}
+              onPress={() => onBannerPress(item)}
+              activeOpacity={0.9}
+            >
+              <Image 
+                source={{ uri: item.image }} 
+                style={styles.bannerImage}
+                resizeMode="cover"
+              />
+              <View style={styles.bannerOverlay}>
+                <Text style={styles.bannerTitle}>{item.title}</Text>
+                {item.subtitle && <Text style={styles.bannerSubtitle}>{item.subtitle}</Text>}
+              </View>
+              <View style={styles.bannerAdBadge}>
+                <Text style={styles.bannerAdText}>AD</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+        {bannerData.length > 1 && (
+          <View style={styles.bannerIndicators}>
+            {bannerData.map((_: any, index: number) => (
+              <View 
+                key={index}
+                style={[
+                  styles.bannerDot,
+                  activeIndex === index && styles.bannerDotActive
+                ]}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
