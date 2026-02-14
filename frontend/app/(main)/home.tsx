@@ -857,17 +857,18 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginLeft: 8,
   },
-  // Banner Carousel Styles - Flipkart-style
+  // Banner Carousel Styles - Clean with no peek
   bannerCarouselContainer: {
     marginTop: 12,
     marginBottom: 20,
   },
   bannerSlide: {
-    width: SCREEN_WIDTH, // Full screen width for paging
-    paddingHorizontal: 20, // 20px padding on each side = centered card
+    width: SCREEN_WIDTH,
+    paddingHorizontal: 20,
+    overflow: 'hidden', // Prevent any peek of adjacent slides
   },
   bannerCard: {
-    width: '100%', // Takes full width of slide minus padding
+    width: '100%',
     height: 160,
     borderRadius: 16,
     overflow: 'hidden',
