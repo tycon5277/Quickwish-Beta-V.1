@@ -13,6 +13,9 @@ const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ||
                    process.env.EXPO_PUBLIC_BACKEND_URL || 
                    'https://order-lifecycle-8.preview.emergentagent.com';
 
+// Promotions Backend URL
+const PROMOTIONS_BACKEND_URL = 'https://promote-feature.preview.emergentagent.com';
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface HubVendor {
